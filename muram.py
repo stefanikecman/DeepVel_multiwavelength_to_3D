@@ -25,6 +25,7 @@ def read_hmean(datapath, iteration):
 
 def read_Iout(datapath, iteration):
     filename = f"I_out.{iteration:06d}"
+    #print("Reading from filename: ", filename)
     filepath = os.path.join(datapath, filename)
     data = np.fromfile(filepath, dtype=np.float32)
     Nvar = data[0].astype(int) # this is 1

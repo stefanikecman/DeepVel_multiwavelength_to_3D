@@ -4,12 +4,13 @@ import muram as muram
 import numpy as np
 import torch
 import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
 main_path = "/dat/milic/2D/"
 destination_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/intensities/"
 destination_velocities = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/velocities/"
-dataset_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/"
+dataset_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/"
 
 def load_data (origin_path, destination_path):
     filenames = os.listdir(origin_path)
@@ -50,20 +51,38 @@ def create_dataset(dataset_path, int_path, vel_path):
     indices1 = list(range(0, 18000, 50))
     indices2 = list(range(50, 18050, 50))
 
-    intensities = os.listdir(int_path)
     velocities = os.listdir(vel_path)
+    velocities.sort()
 
+    #print(velocities [0])
+    #print (velocities[1])
+
+    
     vxs = [v for v in velocities if "vx" in v]
     vys = [v for v in velocities if "vy" in v]
+    #print(vxs[0])
+    #print(vys[0])
 
-#    count = 0
-#    for i in range(len(indices1)):
-#        i1 = muram.MuramIntensity(int_path, indices1[i])
-#        i2 = muram.MuramIntensity(int_path, indices2[i])
+    
+    count = 0
+    for i in range(len(indices1)):
+        i1 = muram.MuramIntensity(int_path, indices1[i])
+        i2 = muram.MuramIntensity(int_path, indices2[i])
+        #print('I1 has index ', indices1[i])
+        #print('I2 has index ', indices2[i])
+        
+        intensities_concat = np.stack([i1, i2], axis = 0)
 
-#        intensities_concat = np.stack([i1, i2], axis = 0)
-#        np.save(dataset_path+"inputs/" + file_naming("intensities", count) + ".npy", intensities_concat)
-#        count +=1
+        #plt.figure(figsize=[8,3])
+        #plt.subplot(121)
+        #plt.imshow(intensities_concat[0,1200:1264, 500:564].T, origin='lower')
+        #plt.subplot(122)
+        #plt.imshow(intensities_concat[0,1200:1264, 500:564].T, origin='lower')
+        #plt.savefig('debug_intensities.png')
+
+        np.save(dataset_path+"inputs/" + file_naming("intensities", count) + ".npy", intensities_concat)
+        count +=1
+
     
     count = 0
     for i in range(len(indices1)):
@@ -73,13 +92,19 @@ def create_dataset(dataset_path, int_path, vel_path):
         vy1 = np.load(vel_path + file_naming("vy", indices1[i])+ ".npy")
         vy2 = np.load(vel_path + file_naming("vy", indices2[i])+ ".npy")
 
+        #print('vx1 has index ', file_naming("vx", indices1[i]))
+        #print('vy1 has index ', file_naming("vy", indices1[i]))
+        #print('vx2 has index ', file_naming("vx", indices2[i]))
+        #print('vy2 has index ', file_naming("vy", indices2[i]))
+
         vx_out = (vx1 + vx2) / 2
         vy_out = (vy1 + vy2) / 2
 
         velocities_concat = np.stack([vx_out, vy_out], axis = 0)
         np.save(dataset_path + "labels/" + file_naming("velocities", count) + ".npy", velocities_concat)
         count+=1
-
+    
+    
 
 def crop_image_center (original_dir, input_data_name, new_dim, save_dir):
 
@@ -110,8 +135,37 @@ def crop_image (original_dir, input_data_name, new_dim, save_dir):
     for i in range(len(cropped_img)):
         np.save(save_dir + input_data_name.replace(".npy", "_") + str (i) + ".npy", cropped_img[i])
 
-def normalize_layerwise (input_data):
+def crop_image_every_sixth (original_dir, input_data_name, new_dim, save_dir):
+
+    input_data = np.load(original_dir + input_data_name)
+
+    _, h, w = input_data.shape
+    cropped_img = []
+
+    for i in range(0, h, new_dim):
+        for j in range(0, w, new_dim):
+            cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
+    
+    for i in range(0, len(cropped_img), 6):
+        np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
+
+def crop_image_every_twelfth (original_dir, input_data_name, new_dim, save_dir):
+
+    input_data = np.load(original_dir + input_data_name)
+
+    _, h, w = input_data.shape
+    cropped_img = []
+
+    for i in range(0, h, new_dim):
+        for j in range(0, w, new_dim):
+            cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
+    
+    for i in range(0, len(cropped_img), 12):
+        np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
+
+def normalize_layerwise_old (input_data):
     #Stefani added
+    # TODO normalize for the whole data, not 0 and 1
 
     if (torch.is_tensor(input_data)):
         mean_0 = torch.mean(input_data[0])
@@ -139,15 +193,32 @@ def normalize_layerwise (input_data):
 
     return norm_input_data
 
+def normalize_layerwise (input_data):
 
-def plot_predictions(int_gt, vel_gt, vel_pred, filename):
+    if (torch.is_tensor(input_data)):
+        mean = torch.mean(input_data)
+        std = torch.std(input_data)
+        norm_input_data = input_data.detach().clone()
+
+    else:
+        mean = np.mean(input_data)
+        std = np.std(input_data)
+
+        norm_input_data = input_data.copy()
+
+    norm_input_data = (input_data - mean) / std
+
+    return norm_input_data
+
+
+def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
 
     matplotlib.use('agg')
     plt.figure(figsize = (20, 80))
     fig, ax = plt.subplots(nrows = 3, ncols = 2, sharex = True, sharey = True)
 
     intensity_0 = int_gt[0, :, :].cpu().numpy()
-    intensity_1 = vel_gt[1, :, :].cpu().numpy()
+    intensity_1 = int_gt[1, :, :].cpu().numpy()
 
     vel_0 = vel_gt[0, :, :].cpu().numpy()
     vel_1 = vel_gt[1, :, :].cpu().numpy()
@@ -183,7 +254,7 @@ def plot_predictions(int_gt, vel_gt, vel_pred, filename):
     ax[2][1].set_title('vy - predicted')
     fig.colorbar(im, ax = ax[2][1])
 
-    plt.savefig('test_results/'+filename + '.png')
+    plt.savefig(path_save+filename + '.png')
 
 
 #load_data (main_path, destination_path)
@@ -191,22 +262,27 @@ def plot_predictions(int_gt, vel_gt, vel_pred, filename):
 #create_dataset(dataset_path, destination_path, destination_velocities)
 
 
-input_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/inputs/"
-labels_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/labels/"
+#input_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/inputs/"
+#labels_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/labels/"
 
-cropped_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_center/"
+'''
+cropped_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_15k/"
 
 intensities = os.listdir(input_dir)
 velocities = os.listdir(labels_dir)
 
+intensities.sort()
+velocities.sort()
 
-#for i in intensities:
-#    crop_image_center(input_dir, i, 64, cropped_dir+"inputs/")
-
-
-#for v in velocities:
-#   crop_image_center(labels_dir, v, 64, cropped_dir+"labels/")
+for i in intensities:
+    crop_image_every_twelfth(input_dir, i, 64, cropped_dir+"inputs/")
 
 
-im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/inputs/intensities_000344.npy')
-print(im.shape)
+for v in velocities:
+   crop_image_every_twelfth(labels_dir, v, 64, cropped_dir+"labels/")
+
+'''
+#im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/inputs/intensities_000344.npy')
+#print(im.shape)
+
+#print(len(os.listdir("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_30k/labels")))

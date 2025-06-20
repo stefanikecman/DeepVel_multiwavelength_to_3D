@@ -143,21 +143,8 @@ class DeepVel_net(nn.Module):
 
 class DeepVel_run(object):
     def __init__(self, root = None):
-
-        """
-        Stefani's project:
-
-        Class used to use and train DeepVel
-
-        Parameters
-        ----------
-        root : string
-            main folder where input files .h5 are located named Training.h5 and Testing.h5
-        
-        """
-                
+ 
         self.root = root
-
         self.n_filters = 32     
         self.batch_size = 64
         self.n_conv_layers = 20 #Number of residual blocks
@@ -169,7 +156,7 @@ class DeepVel_run(object):
 
         if root:
 
-            self.dataset = dataset_deepVel('dataset_cropped_center')
+            self.dataset = dataset_deepVel('dataset_cropped_17k')
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
 
@@ -205,6 +192,15 @@ class DeepVel_run(object):
             for batch_i, (x, y) in enumerate(self.trainloader):
                 self.optimizer.zero_grad()
                 outputs = self.model(x.to(device))
+                #if (epoch == 0 and batch_i == 0):
+                #    print(x.shape, y.shape)
+                #    plt.figure(figsize=[10,4])
+                #    plt.subplot(121)
+                #    plt.imshow(x[0,0].T, origin='lower', vmin=-2,vmax=2)
+                #    plt.subplot(122)
+                #    plt.imshow(x[0,1].T, origin='lower', vmin=-2,vmax=2)
+                #    plt.savefig("test_within_training.png")
+                
                 loss = self.criterion(outputs, y.to(device))
                 loss.backward()
                 self.optimizer.step()
@@ -288,6 +284,7 @@ class DeepVel_run(object):
         if x.dim() == 3:
             x = x.unsqueeze(0)
 
+        x = normalize_layerwise(x)
         start = time.time()
     
         with torch.no_grad():    
@@ -308,17 +305,22 @@ if (__name__ == '__main__'):
     deepvel_v1 = DeepVel_run(main_root)
 
     #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
-    #deepvel_v1.train(500)
-    db_check = deepvel_v1.testset[10]
-    image, vel = db_check
-    vel = normalize_layerwise(vel)
-    image = normalize_layerwise(image)
+    #deepvel_v1.train(2)
 
-    params_model = main_root+r'/network/DeepVel_torch_epoch_498_0.23716.pt'
+   
+    test_indices = [0, 50, 100, 150, 200, 250]
+    params_model = main_root+r'/network/DeepVel_torch_epoch_114_0.27915.pt'
 
-    vel_pred = deepvel_v1.predict(image, params_model)
-    mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
-    print("MSE loss: ", mse_l)
+    for ti in test_indices:
+        db_check = deepvel_v1.testset[ti]
+        image, vel = db_check
+        vel = normalize_layerwise(vel)
+        image = normalize_layerwise(image)
 
-    plot_predictions(image, vel, vel_pred, "test_10")
+        vel_pred = deepvel_v1.predict(image, params_model)
+        mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
+        print("MSE loss: ", mse_l)
+
+        plot_predictions(image, vel, vel_pred, "test_results/trained_on_17k_200epochs/", "test_"+str(ti)) 
+        
     
