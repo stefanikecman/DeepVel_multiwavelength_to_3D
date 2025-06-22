@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from torcheval.metrics.functional import binary_accuracy
 import time
 import matplotlib
-from prepare_data import normalize_layerwise, plot_predictions
+from prepare_data import normalize_layerwise, plot_predictions, plot_test_full_map
 
 
 class dataset_deepVel(Dataset): 
@@ -150,6 +150,7 @@ class DeepVel_run(object):
         self.n_conv_layers = 20 #Number of residual blocks
         self.in_channels = 2
         self.out_channels = 2
+        #self.lr = 1e-3
         self.lr = 1e-4
 
         self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
@@ -169,6 +170,8 @@ class DeepVel_run(object):
 
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        #self.optimizer = optim.SGD(self.model.parameters(), lr=self.lr)
+    
 
 
     def train(self, epochs):
@@ -186,6 +189,10 @@ class DeepVel_run(object):
         min_loss = torch.tensor(float('inf'))
         loss_list = []
         save_losses = []
+
+        #scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=30, gamma=0.1)
+        scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, gamma = 0.96)
+
         for epoch in range(epochs):
             self.model.train()
             running_loss = 0.0
@@ -218,6 +225,7 @@ class DeepVel_run(object):
                     np.mean(loss_list),
                     )
                 )
+            scheduler.step()
 
             val_loss_list = []
             val_acc_list = []
@@ -281,6 +289,9 @@ class DeepVel_run(object):
         self.model.load_state_dict(model_weights)
         self.model.eval()
 
+        if isinstance(x, np.ndarray): 
+            x = torch.from_numpy(x.astype(np.float32))
+        
         if x.dim() == 3:
             x = x.unsqueeze(0)
 
@@ -305,12 +316,12 @@ if (__name__ == '__main__'):
     deepvel_v1 = DeepVel_run(main_root)
 
     #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
-    #deepvel_v1.train(2)
-
-   
+    #deepvel_v1.train(300)
+    
+    params_model = main_root+r'/network/expo_scheduler_Adam_cropped_17k_lr1e-4_300epochs/DeepVel_torch_epoch_249_0.30692.pt'
+    test_save_path = "test_results/trained_on_17k_300_expo_scheduler_Adam/"
+    '''
     test_indices = [0, 50, 100, 150, 200, 250]
-    params_model = main_root+r'/network/DeepVel_torch_epoch_114_0.27915.pt'
-
     for ti in test_indices:
         db_check = deepvel_v1.testset[ti]
         image, vel = db_check
@@ -321,6 +332,10 @@ if (__name__ == '__main__'):
         mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
         print("MSE loss: ", mse_l)
 
-        plot_predictions(image, vel, vel_pred, "test_results/trained_on_17k_200epochs/", "test_"+str(ti)) 
+        plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
+    '''
         
     
+    #### TESTING OF THE WHOLE MAP ####
+
+    plot_test_full_map(8, deepvel_v1, params_model, test_save_path)

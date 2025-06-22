@@ -6,6 +6,8 @@ import torch
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
+import torch.nn as nn
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 main_path = "/dat/milic/2D/"
 destination_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/intensities/"
@@ -214,7 +216,7 @@ def normalize_layerwise (input_data):
 def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
 
     matplotlib.use('agg')
-    plt.figure(figsize = (20, 80))
+    plt.figure(figsize = (100, 100))
     fig, ax = plt.subplots(nrows = 3, ncols = 2, sharex = True, sharey = True)
 
     intensity_0 = int_gt[0, :, :].cpu().numpy()
@@ -256,33 +258,53 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
 
     plt.savefig(path_save+filename + '.png')
 
-
-#load_data (main_path, destination_path)
-#create_velocities(main_path, destination_velocities, 1.0)
-#create_dataset(dataset_path, destination_path, destination_velocities)
+def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path):
 
 
-#input_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/inputs/"
-#labels_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/labels/"
+    map_name = file_naming("intensities", full_map_idx)
+    
+    intensity_full_map = np.load('main_dataset_sorted/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_sorted/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
-'''
-cropped_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_15k/"
+    intensity_full_map = normalize_layerwise(intensity_full_map)
+    velocity_full_map = normalize_layerwise(velocity_full_map)
 
-intensities = os.listdir(input_dir)
-velocities = os.listdir(labels_dir)
+    intensity_full_map = torch.from_numpy(intensity_full_map.astype(np.float32))
+    velocity_full_map = torch.from_numpy(velocity_full_map.astype(np.float32))
 
-intensities.sort()
-velocities.sort()
+    velocity_pred = deepvel_object.predict(intensity_full_map, params_model)
+    mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_full_map.to(device))
+    print("MSE loss full map: ", mse_l)
 
-for i in intensities:
-    crop_image_every_twelfth(input_dir, i, 64, cropped_dir+"inputs/")
+    plot_predictions(intensity_full_map, velocity_full_map, velocity_pred, test_save_path, "fullmap_test")
+
+if (__name__ == '__main__'):
+    #load_data (main_path, destination_path)
+    #create_velocities(main_path, destination_velocities, 1.0)
+    #create_dataset(dataset_path, destination_path, destination_velocities)
 
 
-for v in velocities:
-   crop_image_every_twelfth(labels_dir, v, 64, cropped_dir+"labels/")
+    #input_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/inputs/"
+    #labels_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_sorted/labels/"
 
-'''
-#im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/inputs/intensities_000344.npy')
-#print(im.shape)
+    '''
+    cropped_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_15k/"
 
-#print(len(os.listdir("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_30k/labels")))
+    intensities = os.listdir(input_dir)
+    velocities = os.listdir(labels_dir)
+
+    intensities.sort()
+    velocities.sort()
+
+    for i in intensities:
+        crop_image_every_twelfth(input_dir, i, 64, cropped_dir+"inputs/")
+
+
+    for v in velocities:
+    crop_image_every_twelfth(labels_dir, v, 64, cropped_dir+"labels/")
+
+    '''
+    #im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset/inputs/intensities_000344.npy')
+    #print(im.shape)
+
+    #print(len(os.listdir("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_30k/labels")))
