@@ -258,7 +258,7 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
 
     plt.savefig(path_save+filename + '.png')
 
-def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path):
+def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None):
 
 
     map_name = file_naming("intensities", full_map_idx)
@@ -269,14 +269,34 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)
 
-    intensity_full_map = torch.from_numpy(intensity_full_map.astype(np.float32))
-    velocity_full_map = torch.from_numpy(velocity_full_map.astype(np.float32))
+    if zoomed_in_size != None:
+        #plot the central part zoomed in to that size
+        print(intensity_full_map.shape)
+        _, h_full, w_full = intensity_full_map.shape
+        h_zoomed_in, w_zoomed_in = zoomed_in_size
 
-    velocity_pred = deepvel_object.predict(intensity_full_map, params_model)
-    mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_full_map.to(device))
+        # new coordinates:
+        h1 = (h_full//2 - int(h_zoomed_in / 2)) 
+        h2 = (h_full//2 + int(h_zoomed_in / 2))
+        w1 = (w_full//2 - int(w_zoomed_in / 2)) 
+        w2 = (w_full//2 + int(w_zoomed_in / 2))
+
+        intensity_to_plot = intensity_full_map[:, h1:h2, w1:w2]
+        velocity_to_plot = velocity_full_map[:, h1:h2, w1:w2]
+
+    else:
+        intensity_to_plot = intensity_full_map
+        velocity_to_plot = velocity_full_map
+
+    intensity_to_plot = torch.from_numpy(intensity_to_plot.astype(np.float32))
+    velocity_to_plot = torch.from_numpy(velocity_to_plot.astype(np.float32))
+
+    velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
+    mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_to_plot.to(device))
+
     print("MSE loss full map: ", mse_l)
 
-    plot_predictions(intensity_full_map, velocity_full_map, velocity_pred, test_save_path, "fullmap_test")
+    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name)
 
 if (__name__ == '__main__'):
     #load_data (main_path, destination_path)
