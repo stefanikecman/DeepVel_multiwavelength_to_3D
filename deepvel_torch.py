@@ -17,7 +17,8 @@ import matplotlib.pyplot as plt
 from torcheval.metrics.functional import binary_accuracy
 import time
 import matplotlib
-from prepare_data import normalize_layerwise, plot_predictions, plot_test_full_map
+from prepare_data import normalize_layerwise
+from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation
 
 
 class dataset_deepVel(Dataset): 
@@ -318,9 +319,9 @@ if (__name__ == '__main__'):
     #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
     #deepvel_v1.train(300)
     
-    params_model = main_root+r'/network/expo_scheduler_Adam_cropped_17k_lr1e-4_300epochs/DeepVel_torch_epoch_249_0.30692.pt'
+    params_model = main_root+r'/network/expo_scheduler_Adam_cropped_17k_lr1e-2_600epochs/DeepVel_torch_epoch_65_0.22539.pt'
     test_save_path = "test_results/trained_on_17k_300_expo_scheduler_Adam/"
-    '''
+    
     test_indices = [0, 50, 100, 150, 200, 250]
     for ti in test_indices:
         db_check = deepvel_v1.testset[ti]
@@ -332,10 +333,13 @@ if (__name__ == '__main__'):
         mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
         print("MSE loss: ", mse_l)
 
-        plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
-    '''
+        print(calculate_correlation(vel, vel_pred))
+        #plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
+        #plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
+
+    
         
     
     #### TESTING OF THE WHOLE MAP ####
 
-    plot_test_full_map(8, deepvel_v1, params_model, test_save_path)
+    #plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
