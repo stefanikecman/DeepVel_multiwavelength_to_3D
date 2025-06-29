@@ -8,8 +8,11 @@ matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import torch.nn as nn
 from scipy import stats
+from prepare_data import file_naming, normalize_layerwise
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+#TODO PLOTS FOR 4 CHANNELS / either plot the middle 2 (check that) or all 4
 
 def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
 
@@ -61,8 +64,9 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
 
     map_name = file_naming("intensities", full_map_idx)
     
-    intensity_full_map = np.load('main_dataset_sorted/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_sorted/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    #TODO fix this choosing of experiment number
+    intensity_full_map = np.load('main_dataset_experiment1/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment1/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)
@@ -95,6 +99,8 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
     print("MSE loss full map: ", mse_l)
 
     plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name)
+    plot_scatter_plot(velocity_to_plot, velocity_pred, test_save_path, 'scatter_'+name)
+    print(calculate_correlation(velocity_to_plot, velocity_pred))
 
 def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filename):
 
@@ -104,15 +110,21 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     matplotlib.use('agg')
 
     plt.clf()
-    plt.figure(figsize=[15,8])
+    plt.figure(figsize=[15,15])
     fig, ax = plt.subplots(nrows = 1, ncols = 2, sharex = True, sharey = True)
 
-    im = ax[0].scatter(original_velocity[0].flatten(), predicted_velocity[0].flatten())
+    im = ax[0].scatter(original_velocity[0].flatten(), predicted_velocity[0].flatten(), alpha = 0.05, linewidths = 0.7)
+    min0 = min(original_velocity[0].min(), predicted_velocity[0].min())
+    max0 = max(original_velocity[0].max(), predicted_velocity[0].max())
+    ax[0].plot([min0, max0], [min0, max0], color = 'red') 
     ax[0].set_title('Vx - original vs predicted')
     ax[0].set_xlabel('Original data')
     ax[0].set_ylabel('Predicted data')
 
-    im = ax[1].scatter(original_velocity[1].flatten(), predicted_velocity[1].flatten())
+    im = ax[1].scatter(original_velocity[1].flatten(), predicted_velocity[1].flatten(), alpha = 0.05,linewidths = 0.7)
+    min1 = min(original_velocity[1].min(), predicted_velocity[1].min())
+    max1 = max(original_velocity[1].max(), predicted_velocity[1].max())
+    ax[1].plot([min1, max1], [min1, max1], color = 'red') 
     ax[1].set_title('Vy - original vs predicted')
     ax[1].set_xlabel('Original data')
     ax[1].set_ylabel('Predicted data')
@@ -121,6 +133,7 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     plt.close()
 
 def calculate_correlation (original, predicted):
+    #TODO generalizovati funkciju, vratiti kanala koliko input ima dimenzija, samo da se skapira
 
     '''
     Pearson correlation coefficient - statistic:
@@ -140,3 +153,126 @@ def calculate_correlation (original, predicted):
     pr_1 = stats.pearsonr(original[1, :, :].flatten(), predicted[1, :, :].flatten())
 
     return [pr_0, pr_1]
+
+#def plot_prediction_and_scatter ():
+
+
+def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True):
+    map_name = file_naming("intensities", full_map_idx)
+    
+    intensity_full_map = np.load('main_dataset_experiment1/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment1/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+
+    intensity_full_map = normalize_layerwise(intensity_full_map)
+    velocity_full_map = normalize_layerwise(velocity_full_map)
+
+    if zoomed_in_size != None:
+        #plot the central part zoomed in to that size
+        print(intensity_full_map.shape)
+        _, h_full, w_full = intensity_full_map.shape
+        h_zoomed_in, w_zoomed_in = zoomed_in_size
+
+        # new coordinates:
+        h1 = (h_full//2 - int(h_zoomed_in / 2)) 
+        h2 = (h_full//2 + int(h_zoomed_in / 2))
+        w1 = (w_full//2 - int(w_zoomed_in / 2)) 
+        w2 = (w_full//2 + int(w_zoomed_in / 2))
+
+        intensity_to_plot = intensity_full_map[:, h1:h2, w1:w2]
+        velocity_to_plot = velocity_full_map[:, h1:h2, w1:w2]
+
+    else:
+        intensity_to_plot = intensity_full_map
+        velocity_to_plot = velocity_full_map
+
+    intensity_to_plot = torch.from_numpy(intensity_to_plot.astype(np.float32))
+    velocity_to_plot = torch.from_numpy(velocity_to_plot.astype(np.float32))
+
+    velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
+    mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_to_plot.to(device))
+
+    print("MSE loss full map: ", mse_l)
+
+    matplotlib.use('agg')
+    plt.figure()
+
+    nrows = 4 if plot_intensity else 3
+    fig, ax = plt.subplots(nrows = nrows, ncols = 2, figsize=(10, 18))
+
+    if plot_intensity == True:
+        intensity_0 = intensity_to_plot[0, :, :].cpu().numpy()
+        intensity_1 = intensity_to_plot[1, :, :].cpu().numpy()
+
+    vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
+    vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
+
+    vel_0_pred = velocity_pred[0, :, :].cpu().numpy()
+    vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
+
+    vmin = -3 * torch.std(velocity_to_plot)
+    vmax = -1 * vmin
+
+    row_idx = 0
+    if plot_intensity == True:
+        im = ax[0][0].imshow(intensity_0, cmap='magma')
+        ax[0][0].set_title('Intensity - channel 0')
+        fig.colorbar(im, ax = ax[0][0])
+
+
+        im = ax[0][1].imshow(intensity_1, cmap='magma')
+        ax[0][1].set_title('Intensity - channel 1')
+        fig.colorbar(im, ax = ax[0][1])
+
+        row_idx += 1
+
+    im = ax[row_idx][0].imshow(vel_0, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][0].set_title('vx - ground truth')
+    fig.colorbar(im, ax = ax[1][0])
+
+    ax[row_idx][1].imshow(vel_1, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][1].set_title('vy - ground truth')
+    fig.colorbar(im, ax = ax[1][1])
+
+    row_idx +=1
+
+    ax[row_idx][0].imshow(vel_0_pred, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][0].set_title('vx - predicted')
+    fig.colorbar(im, ax = ax[2][0])
+
+    ax[row_idx][1].imshow(vel_1_pred, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][1].set_title('vy - predicted')
+    fig.colorbar(im, ax = ax[2][1])
+
+    row_idx +=1
+
+    pearson0, pearson1 = calculate_correlation(velocity_to_plot, velocity_pred)
+    pearson0 = pearson0.statistic
+    pearson1 = pearson1.statistic
+
+    vmin2 = -3 * np.std(vel_0)
+    vmax2 = -1 * vmin2
+
+    im = ax[row_idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05,linewidths = 0.7)
+    min0 = min(vel_0.min(), vel_0_pred.min())
+    max0 = max(vel_0.max(), vel_0_pred.max())
+    ax[row_idx][0].set_title('PearsonR = ' + str(pearson0))
+    ax[row_idx][0].plot([min0, max0], [min0, max0], color = 'red') 
+    ax[row_idx][0].set_xlabel('Vx original data')
+    ax[row_idx][0].set_ylabel('Vx predicted data')
+    ax[row_idx][0].set_xlim([vmin2, vmax2])
+    ax[row_idx][0].set_ylim([vmin2, vmax2])
+
+    im = ax[row_idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05,linewidths = 0.7)
+    min1 = min(vel_1.min(), vel_1_pred.min())
+    max1 = max(vel_1.max(), vel_1_pred.max())
+    ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
+    ax[row_idx][1].plot([min1, max1], [min1, max1], color = 'red') 
+    ax[row_idx][1].set_xlabel('Vy original data')
+    ax[row_idx][1].set_ylabel('Vy predicted data')
+    ax[row_idx][1].set_xlim([vmin2, vmax2])
+    ax[row_idx][1].set_ylim([vmin2, vmax2])
+
+    plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
+    plt.close()
+    
+    

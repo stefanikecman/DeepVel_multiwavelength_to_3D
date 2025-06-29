@@ -18,7 +18,7 @@ from torcheval.metrics.functional import binary_accuracy
 import time
 import matplotlib
 from prepare_data import normalize_layerwise
-from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation
+from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map
 
 
 class dataset_deepVel(Dataset): 
@@ -73,7 +73,7 @@ class dataset_deepVel(Dataset):
                 raise ValueError("Input - label data not corresponding: ", self.intensities[self.validation_idx[idx] ]+ " "+ self.velocities[self.validation_idx[idx]])
         
         image = normalize_layerwise(image)
-        vel = normalize_layerwise(vel)
+        #vel = normalize_layerwise(vel)
 
         image = torch.from_numpy(image.astype(np.float32))
         vel = torch.from_numpy(vel.astype(np.float32))
@@ -158,7 +158,7 @@ class DeepVel_run(object):
 
         if root:
 
-            self.dataset = dataset_deepVel('dataset_cropped_17k')
+            self.dataset = dataset_deepVel('dataset_cropped_34k_experiment1')
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
 
@@ -307,7 +307,7 @@ class DeepVel_run(object):
 
         #output = normalization(output, norm_file)
         output = output.squeeze(0)
-        output = normalize_layerwise(output)
+        #output = normalize_layerwise(output)
         
         return output
        
@@ -317,16 +317,17 @@ if (__name__ == '__main__'):
     deepvel_v1 = DeepVel_run(main_root)
 
     #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
-    #deepvel_v1.train(300)
+    #deepvel_v1.train(600)
     
-    params_model = main_root+r'/network/expo_scheduler_Adam_cropped_17k_lr1e-2_600epochs/DeepVel_torch_epoch_65_0.22539.pt'
-    test_save_path = "test_results/trained_on_17k_300_expo_scheduler_Adam/"
+    params_model = main_root+r'/network/experiment1/trained_on_34k_norm2_expo_Adam/DeepVel_torch_epoch_584_0.20124.pt'
+    test_save_path = main_root+r"/test_results/experiment1/norm2/trained_on_34k_600_expo_scheduler_Adam/"
+    
     
     test_indices = [0, 50, 100, 150, 200, 250]
     for ti in test_indices:
         db_check = deepvel_v1.testset[ti]
         image, vel = db_check
-        vel = normalize_layerwise(vel)
+        #vel = normalize_layerwise(vel)
         image = normalize_layerwise(image)
 
         vel_pred = deepvel_v1.predict(image, params_model)
@@ -334,12 +335,13 @@ if (__name__ == '__main__'):
         print("MSE loss: ", mse_l)
 
         print(calculate_correlation(vel, vel_pred))
-        #plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
-        #plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
-
+        plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
+        plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
+    
     
         
     
     #### TESTING OF THE WHOLE MAP ####
 
-    #plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
+    plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
+    plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
