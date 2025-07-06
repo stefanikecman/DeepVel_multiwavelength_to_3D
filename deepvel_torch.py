@@ -143,22 +143,24 @@ class DeepVel_net(nn.Module):
 
 
 class DeepVel_run(object):
-    def __init__(self, root = None):
+    def __init__(self, batch, idx_dataset, network_path, root = None,):
  
         self.root = root
         self.n_filters = 32     
-        self.batch_size = 64
+        self.batch_size = batch
         self.n_conv_layers = 20 #Number of residual blocks
-        self.in_channels = 2
+        self.in_channels = 4
         self.out_channels = 2
         #self.lr = 1e-3
         self.lr = 1e-4
+        self.network_path = network_path
 
         self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
 
         if root:
 
-            self.dataset = dataset_deepVel('dataset_cropped_34k_experiment1')
+            #self.dataset = dataset_deepVel('dataset_cropped_96x96/dataset_cropped_68k_experiment2')
+            self.dataset = dataset_deepVel('dataset_cropped_96x96/dataset_cropped_' + str(idx_dataset) + 'k_experiment2')
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
 
@@ -167,7 +169,7 @@ class DeepVel_run(object):
             self.trainloader = DataLoader(self.trainset, batch_size=self.batch_size, shuffle = True, num_workers = 0)
             self.testloader = DataLoader(self.testset, batch_size=self.batch_size, shuffle = False, num_workers = 0)
 
-            self.summary = summary(self.model, input_size = (self.in_channels, 64, 64), batch_size = self.batch_size) #I will cut out images 64 x 64
+            self.summary = summary(self.model, input_size = (self.in_channels, 96, 96), batch_size = self.batch_size) #I will cut out images 64 x 64
 
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
@@ -251,8 +253,9 @@ class DeepVel_run(object):
             if is_best == True:
                 print("Best_model")      
                 min_loss = min(compare_loss, min_loss)
-                torch.save(self.model.state_dict(), 'network/DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
-
+                #torch.save(self.model.state_dict(), 'network/experiment2/96x96/trained_on_68k_expo_Adam_lr1e-4_batch64_1kepochs/DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
+                torch.save(self.model.state_dict(), self.network_path + '/DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
+            
         print('Finished Training')
 
         dt = datetime.now()
@@ -264,7 +267,9 @@ class DeepVel_run(object):
         dict['Number_epochs'] = epochs
         dict['Bach_size'] = self.batch_size
         dict['Optimizer_lr'] = self.lr
-        with open('network/deepvel_torch_train_params_{}.npy'.format(date_time), 'wb') as f:
+        #with open('network/experiment2/96x96/trained_on_68k_expo_Adam_lr1e-4_batch64_1kepochs/deepvel_torch_train_params_{}.npy'.format(date_time), 'wb') as f:
+        with open(self.network_path + '/deepvel_torch_train_params_{}.npy'.format(date_time), 'wb') as f:
+        
             np.save(f, dict)
             np.save(f, save_losses)
         
@@ -313,35 +318,60 @@ class DeepVel_run(object):
        
 if (__name__ == '__main__'):
 
-    main_root = r"/home/xenoss/data/kecman_project/DeepVel_3D_velocity"
-    deepvel_v1 = DeepVel_run(main_root)
+    main_root = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity"
+    #deepvel_v1 = DeepVel_run(root = main_root, batch = 128, idx_dataset = 34, network_path = 'network/experiment2/96x96/trained_on_34k_expo_Adam_lr1e-4_batch128_600epochs')
+
+    '''
+    #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
+    deepvel_v1.train(600)
+
+    deepvel_v1 = DeepVel_run(root = main_root, batch = 256, idx_dataset = 34, network_path = 'network/experiment2/96x96/trained_on_34k_expo_Adam_lr1e-4_batch256_600epochs')
 
     #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
-    #deepvel_v1.train(600)
-    
-    params_model = main_root+r'/network/experiment1/trained_on_34k_norm2_expo_Adam/DeepVel_torch_epoch_584_0.20124.pt'
-    test_save_path = main_root+r"/test_results/experiment1/norm2/trained_on_34k_600_expo_scheduler_Adam/"
-    
-    
-    test_indices = [0, 50, 100, 150, 200, 250]
-    for ti in test_indices:
-        db_check = deepvel_v1.testset[ti]
-        image, vel = db_check
-        #vel = normalize_layerwise(vel)
-        image = normalize_layerwise(image)
+    deepvel_v1.train(600)
 
-        vel_pred = deepvel_v1.predict(image, params_model)
-        mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
-        print("MSE loss: ", mse_l)
+    deepvel_v1 = DeepVel_run(root = main_root, batch = 128, idx_dataset = 68, network_path = 'network/experiment2/96x96/trained_on_68k_expo_Adam_lr1e-4_batch128_1kepochs')
 
-        print(calculate_correlation(vel, vel_pred))
-        plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
-        plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
+    #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
+    deepvel_v1.train(1000)
+
+    deepvel_v1 = DeepVel_run(root = main_root, batch = 256, idx_dataset = 68, network_path = 'network/experiment2/96x96/trained_on_68k_expo_Adam_lr1e-4_batch256_1kepochs')
+
+    #"We used batches of 32 samples and trained the network for 30 epochs, where an epoch is finished once all training samples have been used." 
+    deepvel_v1.train(1000)
+    '''
     
+    param_name = ['DeepVel_torch_epoch_481_0.21111', 'DeepVel_torch_epoch_418_0.23358', 'DeepVel_torch_epoch_563_0.26820', 'DeepVel_torch_epoch_870_0.18485', 'DeepVel_torch_epoch_558_0.20623', 'DeepVel_torch_epoch_262_0.22672']
+    test_save_paths = ['trained_on_34k_expo_Adam_lr1e-4_batch64_600epochs', 'trained_on_34k_expo_Adam_lr1e-4_batch128_600epochs', 'trained_on_34k_expo_Adam_lr1e-4_batch256_600epochs', 'trained_on_68k_expo_Adam_lr1e-4_batch64_1kepochs', 'trained_on_68k_expo_Adam_lr1e-4_batch128_1kepochs', 'trained_on_68k_expo_Adam_lr1e-4_batch256_1kepochs']
+    batch_sizes = [64, 128, 256, 64, 128, 256]
+    indices_dataset = [34, 34, 34, 68, 68, 68]
     
+    for i in range(len(param_name)):
+        params_model = main_root+'/network/experiment2/96x96/'+ test_save_paths[i]+'/' +param_name[i]+'.pt'
+        test_save_path = main_root+"/test_results/experiment2/96x96/" + test_save_paths[i] + '/'
+        deepvel_v1 = DeepVel_run(root = main_root, batch = batch_sizes[i], idx_dataset = indices_dataset[i], network_path = 'network/experiment2/96x96/' + test_save_paths[i])
+
+        test_indices = [0, 50, 100, 150, 200, 250]
+        for ti in test_indices:
+            db_check = deepvel_v1.testset[ti]
+            image, vel = db_check
+            #vel = normalize_layerwise(vel)
+            image = normalize_layerwise(image)
+
+            vel_pred = deepvel_v1.predict(image, params_model)
+            mse_l = nn.functional.mse_loss(vel_pred.to(device), vel.to(device))
+            print("MSE loss: ", mse_l)
+
+            print(calculate_correlation(vel, vel_pred))
+            plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
+            plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
         
-    
-    #### TESTING OF THE WHOLE MAP ####
+        
+            
+        
+        #### TESTING OF THE WHOLE MAP ####
 
-    plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
-    plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
+        plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
+        plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
+        print(test_save_path)
+    

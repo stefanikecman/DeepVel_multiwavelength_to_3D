@@ -65,8 +65,8 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
     map_name = file_naming("intensities", full_map_idx)
     
     #TODO fix this choosing of experiment number
-    intensity_full_map = np.load('main_dataset_experiment1/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_experiment1/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    intensity_full_map = np.load('main_dataset_experiment2/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment2/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)
@@ -160,8 +160,8 @@ def calculate_correlation (original, predicted):
 def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True):
     map_name = file_naming("intensities", full_map_idx)
     
-    intensity_full_map = np.load('main_dataset_experiment1/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_experiment1/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    intensity_full_map = np.load('main_dataset_experiment2/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment2/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)

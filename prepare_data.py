@@ -205,6 +205,20 @@ def crop_image_every_sixth (original_dir, input_data_name, new_dim, save_dir):
     for i in range(0, len(cropped_img), 6):
         np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
 
+def crop_image_every_third (original_dir, input_data_name, new_dim, save_dir):
+
+    input_data = np.load(original_dir + input_data_name)
+
+    _, h, w = input_data.shape
+    cropped_img = []
+
+    for i in range(0, h, new_dim):
+        for j in range(0, w, new_dim):
+            cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
+    
+    for i in range(0, len(cropped_img), 3):
+        np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
+
 def crop_image_every_twelfth (original_dir, input_data_name, new_dim, save_dir):
 
     input_data = np.load(original_dir + input_data_name)
@@ -305,52 +319,30 @@ if (__name__ == '__main__'):
     #create_velocities(main_path, destination_velocities, 1.0)
     #create_dataset_4_intensities(dataset_path, intensities_path, velocities_path)
 
-    
+    '''
     input_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment2/inputs/"
     labels_dir = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment2/labels/"
 
     
-    cropped_dir_17 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_17k_experiment2/"
-    cropped_dir_34 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_34k_experiment2/"
+    cropped_dir_68 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_96x96/dataset_cropped_68k_experiment2/"
+    cropped_dir_34 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_96x96/dataset_cropped_34k_experiment2/"
     
     intensities = os.listdir(input_dir)
     velocities = os.listdir(labels_dir)
 
     intensities.sort()
     velocities.sort()
-
-    for i in intensities:
-        crop_image_every_twelfth(input_dir, i, 64,  cropped_dir_17+"inputs/")
-        crop_image_every_sixth(input_dir, i, 64, cropped_dir_34+"inputs/")
+    '''
+    #for i in intensities:
+    #    crop_image_every_third(input_dir, i, 96,  cropped_dir_68+"inputs/")
+    #    crop_image_every_sixth(input_dir, i, 96, cropped_dir_34+"inputs/")
         
 
-
+    '''
     for v in velocities:
-        crop_image_every_twelfth(labels_dir, v, 64,  cropped_dir_17+"labels/")
-        crop_image_every_sixth(labels_dir, v, 64, cropped_dir_34+"labels/")
-        
+        crop_image_every_third(labels_dir, v, 96,  cropped_dir_68+"labels/")
+        crop_image_every_sixth(labels_dir, v, 96, cropped_dir_34+"labels/")      
 
-    cropped_dir_34_ex1 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/dataset_cropped_34k_experiment1/"
-    input_dir_ex1 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment1/inputs/"
-    labels_dir_ex1 = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment1/labels/"
-
-    intensities1 = os.listdir(input_dir_ex1)
-    velocities1 = os.listdir(labels_dir_ex1)
-
-    intensities1.sort()
-    velocities1.sort()
-
-    for i in intensities1:
-        crop_image_every_sixth(input_dir_ex1, i, 64, cropped_dir_34_ex1+"inputs/")
-        
-
-
-    for v in velocities1:
-        crop_image_every_sixth(labels_dir_ex1, v, 64, cropped_dir_34_ex1+"labels/")
-        
-
-
-
-    
-    #im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment2/labels/velocities_000000.npy')
-    #print(im.shape)
+    im = np.load('/home/xenoss/data/kecman_project/DeepVel_3D_velocity/main_dataset_experiment2/labels/velocities_000000.npy')
+    print(im.shape)
+    '''
