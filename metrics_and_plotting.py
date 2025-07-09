@@ -14,14 +14,19 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 #TODO PLOTS FOR 4 CHANNELS / either plot the middle 2 (check that) or all 4
 
-def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
+def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, n_input_channels = 2):
 
     matplotlib.use('agg')
     plt.figure(figsize = (100, 100))
     fig, ax = plt.subplots(nrows = 3, ncols = 2, sharex = True, sharey = True)
 
-    intensity_0 = int_gt[0, :, :].cpu().numpy()
-    intensity_1 = int_gt[1, :, :].cpu().numpy()
+    if n_input_channels == 2:
+        intensity_0 = int_gt[0, :, :].cpu().numpy()
+        intensity_1 = int_gt[1, :, :].cpu().numpy()
+
+    elif n_input_channels == 4:
+        intensity_0 = int_gt[1, :, :].cpu().numpy()
+        intensity_1 = int_gt[2, :, :].cpu().numpy()
 
     vel_0 = vel_gt[0, :, :].cpu().numpy()
     vel_1 = vel_gt[1, :, :].cpu().numpy()
@@ -60,13 +65,14 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename):
     plt.savefig(path_save+filename + '.png')
     plt.close()
 
-def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None):
+def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, n_input_channels = 2):
 
     map_name = file_naming("intensities", full_map_idx)
+    if n_input_channels == 2: n_experiment = 1
+    elif n_input_channels == 4: n_experiment = 2
     
-    #TODO fix this choosing of experiment number
-    intensity_full_map = np.load('main_dataset_experiment2/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_experiment2/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)
@@ -98,14 +104,29 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
 
     print("MSE loss full map: ", mse_l)
 
-    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name)
+    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name, n_input_channels = n_input_channels)
     plot_scatter_plot(velocity_to_plot, velocity_pred, test_save_path, 'scatter_'+name)
     print(calculate_correlation(velocity_to_plot, velocity_pred))
 
-def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filename):
+def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filename, plotting_dim = None, zoom_out = 0):
 
-    original_velocity = original_velocity.cpu().numpy()
-    predicted_velocity = predicted_velocity.cpu().numpy()
+    if plotting_dim != None:
+        _, h_full, w_full = intensity_full_map.shape
+        h_zoomed_in, w_zoomed_in = plotting_dim
+
+        # new coordinates:
+        h1 = (h_full//2 - int(h_zoomed_in / 2)) 
+        h2 = (h_full//2 + int(h_zoomed_in / 2))
+        w1 = (w_full//2 - int(w_zoomed_in / 2)) 
+        w2 = (w_full//2 + int(w_zoomed_in / 2))
+
+        original_velocity_plot = original_velocity[:, h1:h2, w1:w2]
+        predicted_velocity_plot = predicted_velocity[:, h1:h2, w1:w2]
+    
+
+    original_velocity_plot = original_velocity_plot.cpu().numpy()
+    predicted_velocity_plot = predicted_velocity_plot.cpu().numpy()
+
 
     matplotlib.use('agg')
 
@@ -113,17 +134,17 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     plt.figure(figsize=[15,15])
     fig, ax = plt.subplots(nrows = 1, ncols = 2, sharex = True, sharey = True)
 
-    im = ax[0].scatter(original_velocity[0].flatten(), predicted_velocity[0].flatten(), alpha = 0.05, linewidths = 0.7)
-    min0 = min(original_velocity[0].min(), predicted_velocity[0].min())
-    max0 = max(original_velocity[0].max(), predicted_velocity[0].max())
+    im = ax[0].scatter(original_velocity_plot[0].flatten(), predicted_velocity_plot[0].flatten(), alpha = 0.05, linewidths = 0.7)
+    min0 = min(original_velocity_plot[0].min(), predicted_velocity_plot[0].min()) - zoom_out
+    max0 = max(original_velocity_plot[0].max(), predicted_velocity_plot[0].max()) + zoom_out
     ax[0].plot([min0, max0], [min0, max0], color = 'red') 
     ax[0].set_title('Vx - original vs predicted')
     ax[0].set_xlabel('Original data')
     ax[0].set_ylabel('Predicted data')
 
-    im = ax[1].scatter(original_velocity[1].flatten(), predicted_velocity[1].flatten(), alpha = 0.05,linewidths = 0.7)
-    min1 = min(original_velocity[1].min(), predicted_velocity[1].min())
-    max1 = max(original_velocity[1].max(), predicted_velocity[1].max())
+    im = ax[1].scatter(original_velocity_plot[1].flatten(), predicted_velocity_plot[1].flatten(), alpha = 0.05,linewidths = 0.7)
+    min1 = min(original_velocity_plot[1].min(), predicted_velocity_plot[1].min()) - zoom_out
+    max1 = max(original_velocity_plot[1].max(), predicted_velocity_plot[1].max()) + zoom_out
     ax[1].plot([min1, max1], [min1, max1], color = 'red') 
     ax[1].set_title('Vy - original vs predicted')
     ax[1].set_xlabel('Original data')
@@ -133,7 +154,6 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     plt.close()
 
 def calculate_correlation (original, predicted):
-    #TODO generalizovati funkciju, vratiti kanala koliko input ima dimenzija, samo da se skapira
 
     '''
     Pearson correlation coefficient - statistic:
@@ -149,19 +169,24 @@ def calculate_correlation (original, predicted):
     original = original.cpu().numpy()
     predicted = predicted.cpu().numpy()
 
-    pr_0 = stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten())
-    pr_1 = stats.pearsonr(original[1, :, :].flatten(), predicted[1, :, :].flatten())
+    pearson_coeffs = []
+    n_channels = original.shape[0]
 
-    return [pr_0, pr_1]
+    for ch in n_channels:
 
-#def plot_prediction_and_scatter ():
+    pearson_coeffs.append(stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten()))
+
+    return pearson_coeffs
 
 
-def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True):
+def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0):
     map_name = file_naming("intensities", full_map_idx)
+
+    if n_input_channels == 2: n_experiment = 1
+    elif n_input_channels == 4: n_experiment = 2
     
-    intensity_full_map = np.load('main_dataset_experiment2/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_experiment2/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
+    velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
 
     intensity_full_map = normalize_layerwise(intensity_full_map)
     velocity_full_map = normalize_layerwise(velocity_full_map)
@@ -200,8 +225,13 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
     fig, ax = plt.subplots(nrows = nrows, ncols = 2, figsize=(10, 18))
 
     if plot_intensity == True:
-        intensity_0 = intensity_to_plot[0, :, :].cpu().numpy()
-        intensity_1 = intensity_to_plot[1, :, :].cpu().numpy()
+        if n_input_channels == 2:
+            intensity_0 = intensity_to_plot[0, :, :].cpu().numpy()
+            intensity_1 = intensity_to_plot[1, :, :].cpu().numpy()
+
+        elif n_input_channels == 4:
+            intensity_0 = intensity_to_plot[1, :, :].cpu().numpy()
+            intensity_1 = intensity_to_plot[2, :, :].cpu().numpy()
 
     vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
     vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
@@ -252,26 +282,27 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
     vmin2 = -3 * np.std(vel_0)
     vmax2 = -1 * vmin2
 
-    im = ax[row_idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05,linewidths = 0.7)
-    min0 = min(vel_0.min(), vel_0_pred.min())
-    max0 = max(vel_0.max(), vel_0_pred.max())
+
     ax[row_idx][0].set_title('PearsonR = ' + str(pearson0))
+
+    im = ax[row_idx][0].scatter(original_velocity_plot[0].flatten(), predicted_velocity_plot[0].flatten(), alpha = 0.05, linewidths = 0.7)
+    min0 = min(original_velocity_plot[0].min(), predicted_velocity_plot[0].min()) - zoom_out
+    max0 = max(original_velocity_plot[0].max(), predicted_velocity_plot[0].max()) + zoom_out
     ax[row_idx][0].plot([min0, max0], [min0, max0], color = 'red') 
-    ax[row_idx][0].set_xlabel('Vx original data')
-    ax[row_idx][0].set_ylabel('Vx predicted data')
-    ax[row_idx][0].set_xlim([vmin2, vmax2])
-    ax[row_idx][0].set_ylim([vmin2, vmax2])
+    ax[row_idx][0].set_title('Vx - original vs predicted')
+    ax[row_idx][0].set_xlabel('Original data')
+    ax[row_idx][0].set_ylabel('Predicted data')
 
-    im = ax[row_idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05,linewidths = 0.7)
-    min1 = min(vel_1.min(), vel_1_pred.min())
-    max1 = max(vel_1.max(), vel_1_pred.max())
     ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
-    ax[row_idx][1].plot([min1, max1], [min1, max1], color = 'red') 
-    ax[row_idx][1].set_xlabel('Vy original data')
-    ax[row_idx][1].set_ylabel('Vy predicted data')
-    ax[row_idx][1].set_xlim([vmin2, vmax2])
-    ax[row_idx][1].set_ylim([vmin2, vmax2])
 
+    im = ax[row_idx][1].scatter(original_velocity_plot[1].flatten(), predicted_velocity_plot[1].flatten(), alpha = 0.05,linewidths = 0.7)
+    min1 = min(original_velocity_plot[1].min(), predicted_velocity_plot[1].min()) - zoom_out
+    max1 = max(original_velocity_plot[1].max(), predicted_velocity_plot[1].max()) + zoom_out
+    ax[row_idx][1].plot([min1, max1], [min1, max1], color = 'red') 
+    ax[row_idx][1].set_title('Vy - original vs predicted')
+    ax[row_idx][1].set_xlabel('Original data')
+    ax[row_idx][1].set_ylabel('Predicted data')
+    
     plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()
     
