@@ -191,7 +191,7 @@ def crop_image (original_dir, input_data_name, new_dim, save_dir):
     for i in range(len(cropped_img)):
         np.save(save_dir + input_data_name.replace(".npy", "_") + str (i) + ".npy", cropped_img[i])
 
-def crop_image_every_sixth (original_dir, input_data_name, new_dim, save_dir):
+def crop_image_every_nth (n, original_dir, input_data_name, new_dim, save_dir):
 
     input_data = np.load(original_dir + input_data_name)
 
@@ -202,36 +202,9 @@ def crop_image_every_sixth (original_dir, input_data_name, new_dim, save_dir):
         for j in range(0, w, new_dim):
             cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
     
-    for i in range(0, len(cropped_img), 6):
+    for i in range(0, len(cropped_img), n):
         np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
 
-def crop_image_every_third (original_dir, input_data_name, new_dim, save_dir):
-
-    input_data = np.load(original_dir + input_data_name)
-
-    _, h, w = input_data.shape
-    cropped_img = []
-
-    for i in range(0, h, new_dim):
-        for j in range(0, w, new_dim):
-            cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
-    
-    for i in range(0, len(cropped_img), 3):
-        np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
-
-def crop_image_every_twelfth (original_dir, input_data_name, new_dim, save_dir):
-
-    input_data = np.load(original_dir + input_data_name)
-
-    _, h, w = input_data.shape
-    cropped_img = []
-
-    for i in range(0, h, new_dim):
-        for j in range(0, w, new_dim):
-            cropped_img.append(input_data[:, i: (i + new_dim), j: (j + new_dim)])
-    
-    for i in range(0, len(cropped_img), 12):
-        np.save(save_dir + input_data_name.replace(".npy", "_cropped_") + str (i) + ".npy", cropped_img[i])
 
 def normalize_layerwise_old(input_data):
     #Stefani added
