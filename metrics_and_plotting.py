@@ -9,10 +9,9 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 from scipy import stats
 from prepare_data import file_naming, normalize_layerwise
+from scipy.stats import linregress
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-#TODO PLOTS FOR 4 CHANNELS / either plot the middle 2 (check that) or all 4
 
 def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, n_input_channels = 2):
 
@@ -27,6 +26,10 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, n_input_chan
     elif n_input_channels == 4:
         intensity_0 = int_gt[1, :, :].cpu().numpy()
         intensity_1 = int_gt[2, :, :].cpu().numpy()
+    
+    elif n_input_channels == 6:
+        intensity_0 = int_gt[2, :, :].cpu().numpy()
+        intensity_1 = int_gt[3, :, :].cpu().numpy()
 
     vel_0 = vel_gt[0, :, :].cpu().numpy()
     vel_1 = vel_gt[1, :, :].cpu().numpy()
@@ -70,6 +73,7 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
     map_name = file_naming("intensities", full_map_idx)
     if n_input_channels == 2: n_experiment = 1
     elif n_input_channels == 4: n_experiment = 2
+    elif n_input_channels == 6: n_experiment = 3
     
     intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
     velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
@@ -122,6 +126,9 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
 
         original_velocity_plot = original_velocity[:, h1:h2, w1:w2]
         predicted_velocity_plot = predicted_velocity[:, h1:h2, w1:w2]
+    else:
+        original_velocity_plot = original_velocity
+        predicted_velocity_plot = predicted_velocity
     
 
     original_velocity_plot = original_velocity_plot.cpu().numpy()
@@ -172,9 +179,8 @@ def calculate_correlation (original, predicted):
     pearson_coeffs = []
     n_channels = original.shape[0]
 
-    for ch in n_channels:
-
-    pearson_coeffs.append(stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten()))
+    for ch in range(n_channels):
+        pearson_coeffs.append(stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten()))
 
     return pearson_coeffs
 
@@ -184,6 +190,7 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
 
     if n_input_channels == 2: n_experiment = 1
     elif n_input_channels == 4: n_experiment = 2
+    elif n_input_channels == 6: n_experiment = 3
     
     intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
     velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
@@ -215,8 +222,8 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
 
     velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
     mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_to_plot.to(device))
-
-    print("MSE loss full map: ", mse_l)
+    rmse_l = torch.sqrt(mse_l)
+    #print("MSE loss full map: ", mse_l)
 
     matplotlib.use('agg')
     plt.figure()
@@ -233,11 +240,18 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
             intensity_0 = intensity_to_plot[1, :, :].cpu().numpy()
             intensity_1 = intensity_to_plot[2, :, :].cpu().numpy()
 
+        elif n_input_channels == 6:
+            intensity_0 = intensity_to_plot[2, :, :].cpu().numpy()
+            intensity_1 = intensity_to_plot[3, :, :].cpu().numpy()
+
     vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
     vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
 
     vel_0_pred = velocity_pred[0, :, :].cpu().numpy()
     vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
+
+    slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(vel_0.flatten(), vel_0_pred.flatten())
+    slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(vel_1.flatten(), vel_1_pred.flatten())
 
     vmin = -3 * torch.std(velocity_to_plot)
     vmax = -1 * vmin
@@ -283,25 +297,31 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
     vmax2 = -1 * vmin2
 
 
-    ax[row_idx][0].set_title('PearsonR = ' + str(pearson0))
+    #ax[row_idx][0].set_title('PearsonR = ' + str(pearson0))
 
-    im = ax[row_idx][0].scatter(original_velocity_plot[0].flatten(), predicted_velocity_plot[0].flatten(), alpha = 0.05, linewidths = 0.7)
-    min0 = min(original_velocity_plot[0].min(), predicted_velocity_plot[0].min()) - zoom_out
-    max0 = max(original_velocity_plot[0].max(), predicted_velocity_plot[0].max()) + zoom_out
+    im = ax[row_idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
+    min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
+    max0 = max(vel_0.max(), vel_0_pred.max()) + zoom_out
     ax[row_idx][0].plot([min0, max0], [min0, max0], color = 'red') 
     ax[row_idx][0].set_title('Vx - original vs predicted')
     ax[row_idx][0].set_xlabel('Original data')
     ax[row_idx][0].set_ylabel('Predicted data')
 
-    ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
+    #ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
 
-    im = ax[row_idx][1].scatter(original_velocity_plot[1].flatten(), predicted_velocity_plot[1].flatten(), alpha = 0.05,linewidths = 0.7)
-    min1 = min(original_velocity_plot[1].min(), predicted_velocity_plot[1].min()) - zoom_out
-    max1 = max(original_velocity_plot[1].max(), predicted_velocity_plot[1].max()) + zoom_out
+    im = ax[row_idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05,linewidths = 0.7)
+    min1 = min(vel_1.min(), vel_1_pred.min()) - zoom_out
+    max1 = max(vel_1.max(), vel_1_pred.max()) + zoom_out
     ax[row_idx][1].plot([min1, max1], [min1, max1], color = 'red') 
     ax[row_idx][1].set_title('Vy - original vs predicted')
     ax[row_idx][1].set_xlabel('Original data')
     ax[row_idx][1].set_ylabel('Predicted data')
+
+    #slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(velocity_to_plot[0].flatten(), velocity_pred[0].flatten())
+    #slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(velocity_to_plot[1].flatten(), velocity_pred[1].flatten())
+
+    fig.text(0.5, 0.01, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}', 
+         ha='center', fontsize=12)
     
     plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()
