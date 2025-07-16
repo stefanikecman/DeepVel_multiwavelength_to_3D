@@ -13,9 +13,12 @@ from scipy.stats import linregress
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, n_input_channels = 2):
+#TODO FIX ARROW DENSITIES AND SIZE (notebook on my pc), font sizes
+
+def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensity = True, n_input_channels = 2, arrows = False):
 
     matplotlib.use('agg')
+    plt.rcParams['font.size'] = 13
     plt.figure(figsize = (100, 100))
     fig, ax = plt.subplots(nrows = 3, ncols = 2, sharex = True, sharey = True)
 
@@ -40,35 +43,63 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, n_input_chan
     vmin = -3 * torch.std(vel_gt)
     vmax = -1 * vmin
 
-    im = ax[0][0].imshow(intensity_0, cmap='magma')
-    ax[0][0].set_title('Intensity - channel 0')
-    fig.colorbar(im, ax = ax[0][0])
+    if arrows:
+        H, W = vel_0.shape
+        X, Y = np.meshgrid(np.arange(H), np.arange(W)) # beecause I transpose plots
+        step = 5
+
+    idx = 0
+    if plot_intensity:
+        im = ax[idx][0].imshow(intensity_0.T, cmap='magma', origin = 'lower')
+        ax[idx][0].set_title('Intensity - channel 0')
+        fig.colorbar(im, ax = ax[idx][0])
 
 
-    im = ax[0][1].imshow(intensity_1, cmap='magma')
-    ax[0][1].set_title('Intensity - channel 1')
-    fig.colorbar(im, ax = ax[0][1])
+        im = ax[idx][1].imshow(intensity_1.T, cmap='magma', origin = 'lower')
+        ax[idx][1].set_title('Intensity - channel 1')
+        fig.colorbar(im, ax = ax[idx][1])
 
-    im = ax[1][0].imshow(vel_0, cmap='bwr', vmin = vmin, vmax = vmax)
-    ax[1][0].set_title('vx - ground truth')
-    fig.colorbar(im, ax = ax[1][0])
+        idx+=1
 
-    ax[1][1].imshow(vel_1, cmap='bwr', vmin = vmin, vmax = vmax)
-    ax[1][1].set_title('vy - ground truth')
-    fig.colorbar(im, ax = ax[1][1])
+    # Ground truth
+    im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
+    if arrows:
+        ax[idx][0].quiver(X[::step, ::step], Y[::step, ::step], vel_0.T[::step, ::step], vel_1[::step, ::step], color = 'black', scale=70, width=0.005, alpha=0.6)
 
-    ax[2][0].imshow(vel_0_pred, cmap='bwr', vmin = vmin, vmax = vmax)
-    ax[2][0].set_title('vx - predicted')
+    ax[idx][0].set_title('vx - ground truth')
+    fig.colorbar(im, ax = ax[idx][0])
+
+    im = ax[idx][1].imshow(vel_1.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
+    if arrows:
+        ax[idx][1].quiver(X[::step, ::step], Y[::step, ::step], vel_0[::step, ::step], vel_1[::step, ::step], color='black', scale=70, width=0.005, alpha=0.6)
+    ax[idx][1].set_title('vy - ground truth')
+    fig.colorbar(im, ax = ax[idx][1])
+
+    idx+=1
+
+    # Predicted
+    im = ax[idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
+    if arrows:
+        ax[idx][0].quiver(X[::step, ::step], Y[::step, ::step],
+                        vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
+                        color='black', scale=70, width=0.005, alpha=0.6)
+    ax[idx][0].set_title('vx - predicted')
     fig.colorbar(im, ax = ax[2][0])
 
-    ax[2][1].imshow(vel_1_pred, cmap='bwr', vmin = vmin, vmax = vmax)
-    ax[2][1].set_title('vy - predicted')
+    im = ax[idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
+    if arrows:
+        ax[idx][1].quiver(X[::step, ::step], Y[::step, ::step],
+                        vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
+                        color='black', scale=70, width=0.005, alpha=0.6)
+    ax[idx][1].set_title('vy - predicted')
     fig.colorbar(im, ax = ax[2][1])
 
-    plt.savefig(path_save+filename + '.png')
+
+    if arrows: plt.savefig(path_save+filename + '_arrows.png')
+    else: plt.savefig(path_save+filename + '.png')
     plt.close()
 
-def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, n_input_channels = 2):
+def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, arrows = False):
 
     map_name = file_naming("intensities", full_map_idx)
     if n_input_channels == 2: n_experiment = 1
@@ -108,7 +139,7 @@ def plot_test_full_map(full_map_idx, deepvel_object, params_model, test_save_pat
 
     print("MSE loss full map: ", mse_l)
 
-    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name, n_input_channels = n_input_channels)
+    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name, plot_intensity = plot_intensity, n_input_channels = n_input_channels, arrows = arrows)
     plot_scatter_plot(velocity_to_plot, velocity_pred, test_save_path, 'scatter_'+name)
     print(calculate_correlation(velocity_to_plot, velocity_pred))
 
@@ -136,7 +167,7 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
 
 
     matplotlib.use('agg')
-
+    plt.rcParams['font.size'] = 13
     plt.clf()
     plt.figure(figsize=[15,15])
     fig, ax = plt.subplots(nrows = 1, ncols = 2, sharex = True, sharey = True)
@@ -185,8 +216,10 @@ def calculate_correlation (original, predicted):
     return pearson_coeffs
 
 
-def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0):
+def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0, write_metrics = False):
     map_name = file_naming("intensities", full_map_idx)
+
+    plt.rcParams['font.size'] = 16
 
     if n_input_channels == 2: n_experiment = 1
     elif n_input_channels == 4: n_experiment = 2
@@ -258,34 +291,34 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
 
     row_idx = 0
     if plot_intensity == True:
-        im = ax[0][0].imshow(intensity_0, cmap='magma')
+        im = ax[0][0].imshow(intensity_0.T, cmap='magma', origin = 'lower')
         ax[0][0].set_title('Intensity - channel 0')
-        fig.colorbar(im, ax = ax[0][0])
+        fig.colorbar(im, ax = ax[row_idx][0])
 
 
-        im = ax[0][1].imshow(intensity_1, cmap='magma')
+        im = ax[0][1].imshow(intensity_1.T, cmap='magma', origin = 'lower')
         ax[0][1].set_title('Intensity - channel 1')
-        fig.colorbar(im, ax = ax[0][1])
+        fig.colorbar(im, ax = ax[row_idx][1])
 
         row_idx += 1
 
-    im = ax[row_idx][0].imshow(vel_0, cmap='bwr', vmin = vmin, vmax = vmax)
+    im = ax[row_idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
     ax[row_idx][0].set_title('vx - ground truth')
-    fig.colorbar(im, ax = ax[1][0])
+    fig.colorbar(im, ax = ax[row_idx][0])
 
-    ax[row_idx][1].imshow(vel_1, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][1].imshow(vel_1.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
     ax[row_idx][1].set_title('vy - ground truth')
-    fig.colorbar(im, ax = ax[1][1])
+    fig.colorbar(im, ax = ax[row_idx][1])
 
     row_idx +=1
 
-    ax[row_idx][0].imshow(vel_0_pred, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
     ax[row_idx][0].set_title('vx - predicted')
-    fig.colorbar(im, ax = ax[2][0])
+    fig.colorbar(im, ax = ax[row_idx][0])
 
-    ax[row_idx][1].imshow(vel_1_pred, cmap='bwr', vmin = vmin, vmax = vmax)
+    ax[row_idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower')
     ax[row_idx][1].set_title('vy - predicted')
-    fig.colorbar(im, ax = ax[2][1])
+    fig.colorbar(im, ax = ax[row_idx][1])
 
     row_idx +=1
 
@@ -320,8 +353,10 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
     #slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(velocity_to_plot[0].flatten(), velocity_pred[0].flatten())
     #slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(velocity_to_plot[1].flatten(), velocity_pred[1].flatten())
 
-    fig.text(0.5, 0.01, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}', 
-         ha='center', fontsize=12)
+    if write_metrics: fig.text(0.5, 0.05, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}', 
+         ha='center', fontsize=16)
+    
+    else: print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}')
     
     plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()

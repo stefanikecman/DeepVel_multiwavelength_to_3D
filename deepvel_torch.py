@@ -339,14 +339,15 @@ if (__name__ == '__main__'):
         print("MSE loss: ", mse_l)
 
         print(calculate_correlation(vel, vel_pred))
+        plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti), arrows = True)
         plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
         plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
         
         #### TESTING OF THE WHOLE MAP ####
 
         plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
-        plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
-        print(test_save_path)
+        plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map", n_input_channels = 6)
+        #print(test_save_path)
     
     '''
     param_name = ['DeepVel_torch_epoch_481_0.21111', 'DeepVel_torch_epoch_418_0.23358', 'DeepVel_torch_epoch_563_0.26820', 'DeepVel_torch_epoch_870_0.18485', 'DeepVel_torch_epoch_558_0.20623', 'DeepVel_torch_epoch_262_0.22672']
