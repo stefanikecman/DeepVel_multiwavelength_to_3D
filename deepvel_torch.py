@@ -345,8 +345,8 @@ if (__name__ == '__main__'):
         
         #### TESTING OF THE WHOLE MAP ####
 
-        plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
-        plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map", n_input_channels = 6)
+    plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
+    plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map", n_input_channels = 6)
         #print(test_save_path)
     
     '''
