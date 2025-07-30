@@ -344,7 +344,8 @@ def normalize_all_outputs (output_path, save_path):
     
     return mean, std
 
-
+def denormalize_data (data, mean, std):
+    return data*std + mean
 
 
 if (__name__ == '__main__'):

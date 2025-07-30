@@ -18,7 +18,7 @@ from torcheval.metrics.functional import binary_accuracy
 import time
 import matplotlib
 from prepare_data import normalize_layerwise
-from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map
+from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map, plot_prediction_and_scatter_full_map_vertical
 
 
 class dataset_deepVel(Dataset): 
@@ -327,6 +327,7 @@ if (__name__ == '__main__'):
 
     deepvel_v1 = DeepVel_run(root = main_root, batch = 64, idx_dataset = 68, network_path = params_model)
 
+    '''
     test_indices = [0, 50, 100, 150, 200, 250]
     for ti in test_indices:
         db_check = deepvel_v1.testset[ti]
@@ -344,9 +345,9 @@ if (__name__ == '__main__'):
         plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
         
         #### TESTING OF THE WHOLE MAP ####
-
-    plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
-    plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map", n_input_channels = 6)
+    '''
+    #plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
+    plot_prediction_and_scatter_full_map_vertical(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map_denormalized_vertical", n_input_channels = 6, denormalized = True)
         #print(test_save_path)
     
     '''
