@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from torcheval.metrics.functional import binary_accuracy
 import time
 import matplotlib
-from prepare_data import normalize_layerwise
+#from prepare_data import normalize_layerwise
 from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map, plot_prediction_and_scatter_full_map_vertical
 
 
@@ -61,7 +61,11 @@ class dataset_deepVel(Dataset):
             #print("image train: ", self.intensities[idx])
             #print("velocity train: ", self.velocities[idx])
 
-            if self.velocities[idx][11:16] != self.intensities[idx][12:17]:
+            # if self.velocities[idx][11:16] != self.intensities[idx][12:17]:
+            #     raise ValueError("Input - label data not corresponding: ", self.intensities[idx] + " "+ self.velocities[idx])
+            intensity_index = self.intensities[idx].replace('intensity_', '')
+            velocity_index = self.velocities[idx].replace('velocities_', '')
+            if velocity_index != intensity_index:
                 raise ValueError("Input - label data not corresponding: ", self.intensities[idx] + " "+ self.velocities[idx])
 
         else:
@@ -72,7 +76,7 @@ class dataset_deepVel(Dataset):
             if self.velocities[self.validation_idx[idx]][11:16] != self.intensities[self.validation_idx[idx]][12:17]:
                 raise ValueError("Input - label data not corresponding: ", self.intensities[self.validation_idx[idx] ]+ " "+ self.velocities[self.validation_idx[idx]])
         
-        image = normalize_layerwise(image)
+        #image = normalize_layerwise(image)
         #vel = normalize_layerwise(vel)
 
         image = torch.from_numpy(image.astype(np.float32))
@@ -143,13 +147,13 @@ class DeepVel_net(nn.Module):
 
 
 class DeepVel_run(object):
-    def __init__(self, batch, idx_dataset, network_path, root = None,):
+    def __init__(self, batch, dataset_path, network_path, in_channels = 2, root = None,):
  
         self.root = root
         self.n_filters = 32     
         self.batch_size = batch
         self.n_conv_layers = 20 #Number of residual blocks
-        self.in_channels = 6
+        self.in_channels = in_channels
         self.out_channels = 2
         #self.lr = 1e-3
         self.lr = 1e-4
@@ -160,7 +164,8 @@ class DeepVel_run(object):
         if root:
 
             #self.dataset = dataset_deepVel('dataset_cropped_96x96/dataset_cropped_68k_experiment2')
-            self.dataset = dataset_deepVel('dataset_cropped_96x96/dataset_cropped_' + str(idx_dataset) + 'k_random_experiment3')
+            #self.dataset = dataset_deepVel('dataset_cropped_96x96/dataset_cropped_' + str(idx_dataset) + 'k_random_experiment3')
+            self.dataset = dataset_deepVel(dataset_path, test_idx = None, test = False)
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
 
@@ -301,7 +306,7 @@ class DeepVel_run(object):
         if x.dim() == 3:
             x = x.unsqueeze(0)
 
-        x = normalize_layerwise(x)
+        #x = normalize_layerwise(x)
         start = time.time()
     
         with torch.no_grad():    
@@ -318,14 +323,24 @@ class DeepVel_run(object):
        
 if (__name__ == '__main__'):
 
-    main_root = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity"
+    main_root = "/dat/xenoss/"
     #deepvel_v1 = DeepVel_run(root = main_root, batch = 64, idx_dataset = 68, network_path = 'network/experiment3/trained_on_68k_expo_Adam_lr1e-4_1kepochs')
     #deepvel_v1.train(1000)
 
-    params_model= main_root + '/network/experiment3/trained_on_68k_expo_Adam_lr1e-4_1kepochs/DeepVel_torch_epoch_891_0.18841.pt'
-    test_save_path = main_root+'/test_results/experiment3/96x96/trained_on_68k_expo_Adam_lr1e-4_batch64_1kepochs/'
+    # params_model= main_root + '/network/experiment3/trained_on_68k_expo_Adam_lr1e-4_1kepochs/DeepVel_torch_epoch_891_0.18841.pt'
+    # test_save_path = main_root+'/test_results/experiment3/96x96/trained_on_68k_expo_Adam_lr1e-4_batch64_1kepochs/'
 
-    deepvel_v1 = DeepVel_run(root = main_root, batch = 64, idx_dataset = 68, network_path = params_model)
+    #deepvel_v1 = DeepVel_run(root = main_root, batch = 64, idx_dataset = 68, network_path = params_model)
+    # temporal_range = [2, 4, 6, 8, 10]
+    # spatial_range = [32, 48, 64, 96, 128]
+
+    # for t in temporal_range:
+    #     for s in spatial_range:
+    #         print(f"Training for timestep {t} and spatial size {s} x {s}")
+    #         deepvel_net = DeepVel_run(root = main_root, in_channels=t, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{t}/cropped/data_{s}x{s}', network_path = main_root + f'models_5x5_norm/timestep_{t}/{s}x{s}/')
+    #         deepvel_net.train(80)
+            
+        
 
     '''
     test_indices = [0, 50, 100, 150, 200, 250]
@@ -347,7 +362,7 @@ if (__name__ == '__main__'):
         #### TESTING OF THE WHOLE MAP ####
     '''
     #plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map", n_input_channels = 6)
-    plot_prediction_and_scatter_full_map_vertical(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map_denormalized_vertical", n_input_channels = 6, denormalized = True)
+    #plot_prediction_and_scatter_full_map_vertical(8, deepvel_v1, params_model, test_save_path, plot_intensity = False, write_metrics = False, name = "not_zoomed_in_full_map_denormalized_vertical", n_input_channels = 6, denormalized = True)
         #print(test_save_path)
     
     '''
@@ -376,12 +391,14 @@ if (__name__ == '__main__'):
             plot_predictions(image, vel, vel_pred, test_save_path, "test_"+str(ti)) 
             plot_scatter_plot(vel, vel_pred, test_save_path, "test_scatter_"+str(ti))
         
-        
+      '''  
             
         
         #### TESTING OF THE WHOLE MAP ####
 
-        plot_test_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
-        plot_prediction_and_scatter_full_map(8, deepvel_v1, params_model, test_save_path, name = "not_zoomed_in_full_map")
-        print(test_save_path)
-    '''
+    deepvel_net = DeepVel_run(root = main_root, in_channels=6, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/timestep_{6}/cropped/data_{128}x{128}', network_path = main_root + f'models_5x5/timestep_{6}/{128}x{128}/')
+    params_model = '/dat/xenoss/models_5x5/timestep_6/128x128/DeepVel_torch_epoch_79_0.14405.pt'
+    #plot_test_full_map(8, deepvel_net, params_model, '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/experiment25_test/', name = "experiment25_not_zoomed_in_full_map")
+    plot_prediction_and_scatter_full_map_vertical(8, deepvel_net, params_model, '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/experiment25_test/', name = "experiment25_not_zoomed_in_full_map", n_input_channels=6, write_metrics=True)
+
+  

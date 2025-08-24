@@ -226,8 +226,8 @@ def calculate_correlation (original, predicted):
 
 
 def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False):
-    map_name = file_naming("intensities", full_map_idx)
-
+    #map_name = file_naming("intensities", full_map_idx)
+    map_name = f"intensities_{full_map_idx}"
     plt.rcParams['font.size'] = 25
     
 
@@ -401,21 +401,26 @@ def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_m
     plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()
 
-def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False):
-    map_name = file_naming("intensities", full_map_idx)
-
+def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, return_metrics = False):
+    #map_name = file_naming("intensities", full_map_idx)
+    map_name = f"intensities_{full_map_idx}"
     plt.rcParams['font.size'] = 25
     
 
-    if n_input_channels == 2: n_experiment = 1
-    elif n_input_channels == 4: n_experiment = 2
-    elif n_input_channels == 6: n_experiment = 3
+    # if n_input_channels == 2: n_experiment = 1
+    # elif n_input_channels == 4: n_experiment = 2
+    # elif n_input_channels == 6: n_experiment = 3
     
-    intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
-    velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    #intensity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/inputs/' + map_name +'.npy')
+    #velocity_full_map = np.load('main_dataset_experiment' + str(n_experiment) + '/labels/' + map_name.replace('intensities', 'velocities') +'.npy')
+    #intensity_full_map = normalize_layerwise(intensity_full_map)
+    #velocity_full_map = normalize_layerwise(velocity_full_map)
 
-    intensity_full_map = normalize_layerwise(intensity_full_map)
-    velocity_full_map = normalize_layerwise(velocity_full_map)
+    intensity_full_map = np.load(dataset_path + f"intensities_{n_input_channels}.npy")
+    velocity_full_map = np.load(dataset_path + f"velocities_{n_input_channels}.npy")
+
+    # intensity_full_map = np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_test/normalized/intensities_10.npy')
+    # velocity_full_map = np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_test/normalized/velocities_10.npy')
 
     extent = [0, velocity_full_map.shape[1]*0.016, 0, velocity_full_map.shape[1]*0.016]
 
@@ -450,10 +455,12 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
 
     nrows = 4 if plot_intensity else 3
 
-    if denormalized: figsize = (25, 35)
-    else: figsize=(13, 20)
+    if denormalized: figsize = (25, 40)
+    else: figsize=(25, 40)
 
     fig, ax = plt.subplots(nrows = nrows, ncols = 2, figsize=figsize)
+    plt.subplots_adjust(hspace=0.4)
+
 
     if plot_intensity == True:
         if n_input_channels == 2:
@@ -467,6 +474,14 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
         elif n_input_channels == 6:
             intensity_0 = intensity_to_plot[2, :, :].cpu().numpy()
             intensity_1 = intensity_to_plot[3, :, :].cpu().numpy()
+        
+        elif n_input_channels == 8:
+            intensity_0 = intensity_to_plot[3, :, :].cpu().numpy()
+            intensity_1 = intensity_to_plot[4, :, :].cpu().numpy()
+
+        elif n_input_channels == 10:
+            intensity_0 = intensity_to_plot[4, :, :].cpu().numpy()
+            intensity_1 = intensity_to_plot[5, :, :].cpu().numpy()
 
     vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
     vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
@@ -482,24 +497,30 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     #TODO intensity denormalization option
 
     if plot_intensity == True:
+        middle_channel = int(n_input_channels/2)
         im = ax[idx][0].imshow(intensity_0.T, cmap='magma', origin = 'lower', extent = extent)
-        ax[idx][0].set_title('Intensity - channel 0', pad = 20)
+        ax[idx][0].set_title(f'Intensity - channel {middle_channel - 1}', pad = 20)
         ax[idx][0].set_xlabel('x [Mm]')
         ax[idx][0].set_ylabel('y [Mm]')
-        cbar = add_colorbar(im, ax[0][idx])
+        #cbar = add_colorbar(im, ax[0][idx])
+        cbar = add_colorbar(im, ax[idx][0])
         
 
 
         im = ax[idx][1].imshow(intensity_1.T, cmap='magma', origin = 'lower', extent = extent)
-        ax[idx][1].set_title('Intensity - channel 1', pad = 20)
+        ax[idx][1].set_title(f'Intensity - channel {middle_channel}', pad = 20)
         ax[idx][1].set_xlabel('x [Mm]')
         ax[idx][1].set_ylabel('y [Mm]')
-        cbar = add_colorbar(im, ax[1][idx])
+        #cbar = add_colorbar(im, ax[1][idx])
+        cbar = add_colorbar(im, ax[idx][1])
 
         idx += 1
 
     mean_vel = 1360.96728515625
     std_vel = 230181.609375
+    vmin = -3 * std_vel/1e5
+    vmax = -1 * vmin
+
     if denormalized:
         vel_0 = denormalize_data(vel_0, mean_vel, std_vel)/1e5
         vel_1 = denormalize_data(vel_1, mean_vel, std_vel)/1e5
@@ -512,13 +533,13 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     ax[idx][0].set_title('vx - ground truth', pad = 20)
     ax[idx][0].set_xlabel('x [Mm]')
     ax[idx][0].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[0][idx])
+    cbar = add_colorbar(im, ax[idx][0])
 
     ax[idx][1].imshow(vel_1.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent)
     ax[idx][1].set_title('vy - ground truth', pad = 20)
     ax[idx][1].set_xlabel('x [Mm]')
     ax[idx][1].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[1][idx])
+    cbar = add_colorbar(im, ax[idx][1])
 
     idx +=1
 
@@ -526,13 +547,13 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     ax[idx][0].set_title('vx - predicted', pad = 20)
     ax[idx][0].set_xlabel('x [Mm]')
     ax[idx][0].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[0][idx])
+    cbar = add_colorbar(im, ax[idx][0])
 
     ax[idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent)
     ax[idx][1].set_title('vy - predicted', pad = 20)
     ax[idx][1].set_xlabel('x [Mm]')
     ax[idx][1].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[1][idx])
+    cbar = add_colorbar(im, ax[idx][1])
 
     idx +=1
 
@@ -556,7 +577,7 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
 
     #ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
 
-    im = ax[idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05,linewidths = 0.7)
+    im = ax[idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05, linewidths = 0.7)
     min1 = min(vel_1.min(), vel_1_pred.min()) - zoom_out
     max1 = max(vel_1.max(), vel_1_pred.max()) + zoom_out
     ax[idx][1].plot([min1, max1], [min1, max1], color = 'red') 
@@ -574,5 +595,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     
     plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()
-    
-    
+
+    if return_metrics:
+        return {"mse": mse_l.item(), "rmse": rmse_l.item(), "pearson_vx": pearson0.item(), "pearson_vy": pearson1.item(), "slope_vx": slope_x.item(), "slope_vy": slope_y.item()}
