@@ -11,6 +11,7 @@ from scipy import stats
 from prepare_data import file_naming, normalize_layerwise, denormalize_data
 from scipy.stats import linregress
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from analysis_fn import get_divergence, get_vorticity, calculate_correlation, get_all_metrics
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -200,29 +201,6 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     plt.savefig(path_save+filename + '.png')
     plt.close()
 
-def calculate_correlation (original, predicted):
-
-    '''
-    Pearson correlation coefficient - statistic:
-
-    Ranges from -1 to 1.
-    +1: perfect positive linear correlation
-    0: no linear correlation
-    -1: perfect negative linear correlation
-
-    pvalue: 
-    A p-value close to 0 means the observed correlation is highly statistically significant.
-    '''
-    original = original.cpu().numpy()
-    predicted = predicted.cpu().numpy()
-
-    pearson_coeffs = []
-    n_channels = original.shape[0]
-
-    for ch in range(n_channels):
-        pearson_coeffs.append(stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten()))
-
-    return pearson_coeffs
 
 
 def plot_prediction_and_scatter_full_map (full_map_idx, deepvel_object, params_model, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False):
@@ -419,9 +397,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     intensity_full_map = np.load(dataset_path + f"intensities_{n_input_channels}.npy")
     velocity_full_map = np.load(dataset_path + f"velocities_{n_input_channels}.npy")
 
-    # intensity_full_map = np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_test/normalized/intensities_10.npy')
-    # velocity_full_map = np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_test/normalized/velocities_10.npy')
-
     extent = [0, velocity_full_map.shape[1]*0.016, 0, velocity_full_map.shape[1]*0.016]
 
     if zoomed_in_size != None:
@@ -489,9 +464,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     vel_0_pred = velocity_pred[0, :, :].cpu().numpy()
     vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
 
-    slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(vel_0.flatten(), vel_0_pred.flatten())
-    slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(vel_1.flatten(), vel_1_pred.flatten())
-
     idx = 0
 
     #TODO intensity denormalization option
@@ -502,7 +474,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
         ax[idx][0].set_title(f'Intensity - channel {middle_channel - 1}', pad = 20)
         ax[idx][0].set_xlabel('x [Mm]')
         ax[idx][0].set_ylabel('y [Mm]')
-        #cbar = add_colorbar(im, ax[0][idx])
         cbar = add_colorbar(im, ax[idx][0])
         
 
@@ -511,7 +482,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
         ax[idx][1].set_title(f'Intensity - channel {middle_channel}', pad = 20)
         ax[idx][1].set_xlabel('x [Mm]')
         ax[idx][1].set_ylabel('y [Mm]')
-        #cbar = add_colorbar(im, ax[1][idx])
         cbar = add_colorbar(im, ax[idx][1])
 
         idx += 1
@@ -557,15 +527,8 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
 
     idx +=1
 
-    pearson0, pearson1 = calculate_correlation(velocity_to_plot, velocity_pred)
-    pearson0 = pearson0.statistic
-    pearson1 = pearson1.statistic
-
     vmin2 = -3 * np.std(vel_0)/1e5
     vmax2 = -1 * vmin2
-
-
-    #ax[row_idx][0].set_title('PearsonR = ' + str(pearson0))
 
     im = ax[idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
     min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
@@ -575,8 +538,6 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     ax[idx][0].set_xlabel('Original data')
     ax[idx][0].set_ylabel('Predicted data')
 
-    #ax[row_idx][1].set_title('PearsonR = ' + str(pearson1))
-
     im = ax[idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05, linewidths = 0.7)
     min1 = min(vel_1.min(), vel_1_pred.min()) - zoom_out
     max1 = max(vel_1.max(), vel_1_pred.max()) + zoom_out
@@ -584,17 +545,27 @@ def plot_prediction_and_scatter_full_map_vertical (full_map_idx, deepvel_object,
     ax[idx][1].set_title('Vy - original vs predicted', pad = 20)
     ax[idx][1].set_xlabel('Original data')
     ax[idx][1].set_ylabel('Predicted data')
+    
+    divergence_orig = get_divergence(vel_0, vel_1)
+    divergence_pred = get_divergence(vel_0_pred, vel_1_pred)
+    vorticity_orig = get_vorticity(vel_0, vel_1)
+    vorticity_pred = get_vorticity(vel_0_pred, vel_1_pred)
 
-    #slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(velocity_to_plot[0].flatten(), velocity_pred[0].flatten())
-    #slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(velocity_to_plot[1].flatten(), velocity_pred[1].flatten())
-
+    mse_l, rmse_l, pearson0, pearson1, slope_x, slope_y = get_all_metrics(velocity_to_plot, velocity_pred).values()
+    mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
+    mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
     if write_metrics: fig.text(0.5, 0.05, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}', 
          ha='center', fontsize=16)
     
-    else: print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}')
-    
-    plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
+    else: 
+        print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}')
+        print(f'Divergence - MSE Loss: {mse_d:.4f}, Root MSE Loss: {rmse_d:.4f}, Pearson: {pearson_d:.3f}, Slope: {slope_d:.3f}')
+        print(f'Vorticity - MSE Loss: {mse_v:.4f}, Root MSE Loss: {rmse_v:.4f}, Pearson: {pearson_v:.3f}, Slope: {slope_v:.3f}')
+    if test_save_path is not None:
+        plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
     plt.close()
 
     if return_metrics:
-        return {"mse": mse_l.item(), "rmse": rmse_l.item(), "pearson_vx": pearson0.item(), "pearson_vy": pearson1.item(), "slope_vx": slope_x.item(), "slope_vy": slope_y.item()}
+        return {"mse": mse_l, "rmse": rmse_l, "pearson_vx": pearson0, "pearson_vy": pearson1, "slope_vx": slope_x, "slope_vy": slope_y, 
+                "mse_divergence": mse_d, "rmse_divergence": rmse_d, "pearson_divergence": pearson_d, "slope_divergence": slope_d,
+                "mse_vorticity": mse_v, "rmse_vorticity": rmse_v, "pearson_vorticity": pearson_v, "slope_vorticity": slope_v}

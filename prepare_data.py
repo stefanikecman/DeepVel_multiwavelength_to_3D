@@ -10,6 +10,7 @@ import torch.nn as nn
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 import random
 import shutil
+import muram as mio
 
 main_path = "/dat/milic/2D/"
 intensities_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/intensities/"
@@ -51,6 +52,20 @@ def create_velocities(main_path, velocity_path, tau = 1.0): #could have done wit
         vy = data.vz
         np.save(velocity_path+file_naming("vx", i)+".npy", vx)
         np.save(velocity_path+file_naming("vy", i)+".npy", vy)
+
+def create_B (main_path, B_path_save, tau = 1.0):
+
+    for i in range(0, 18050, 50):
+        data = mio.MuramTauSlice(main_path,i,1.0)
+        B = data.Bx.T # or dont transpose?
+        np.save(B_path_save+file_naming("B", i)+".npy", B)
+
+def create_vz (main_path, vz_path_save, tau = 1.0):
+
+    for i in range(0, 18050, 50):
+        data = mio.MuramTauSlice(main_path,i,1.0)
+        vz = data.vz.T # or dont transpose?
+        np.save(vz_path_save+file_naming("vz", i)+".npy", vz)
 
 def create_dataset_2_intensities (dataset_path, int_path, vel_path, last_idx):
     indices1 = list(range(0, last_idx, 50))
@@ -608,15 +623,14 @@ def create_test_data_5x5_experiments():
 if (__name__ == '__main__'):
     
     main_root = "/dat/xenoss/"
-    #generate_labels_5x5_experiments()
-    # intensity_names = os.listdir(main_dataset + 'inputs/')
-    # intensity_names.sort()  
-    # velocities = os.listdir(main_dataset + 'labels/')
-    # velocities.sort()
 
-    # vel_x = [v for v in velocities if "vx" in v]
-    # vel_y = [v for v in velocities if "vy" in v]
+    ###### NOTE CREATE B AND VZ ###########
 
+    Vz = [s.vz for s in slices]
+
+
+
+    ######################################
     # intensities = [muram.MuramIntensity(main_dataset + 'inputs/', i) for i in range(12000, 18050, 50)]
 
     # stacked_intensities = np.stack(intensities, axis = 0)
