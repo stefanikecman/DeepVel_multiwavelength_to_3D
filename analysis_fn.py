@@ -8,39 +8,75 @@ from scipy.stats import linregress
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def get_divergence(vx, vy, dx = 0.016 * 1e6, dy = 0.016 * 1e6):
+def get_divergence(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
+    """
+    Calculate the divergence of a 2D vector field (vx, vy).
+    Args:
+        vx: x-component of the vector field (2D tensor)
+        vy: y-component of the vector field (2D tensor)
+        dx: spacing in the x-direction (default in Mm)
+        dy: spacing in the y-direction (default in Mm)
+    Returns:
+        Divergence of the vector field (2D tensor)
+    """
+    if isinstance(vx, np.ndarray):
+        vx = torch.from_numpy(vx)
+    if isinstance(vy, np.ndarray):
+        vy = torch.from_numpy(vy)
 
-    if isinstance(vx, torch.Tensor):
-        vx = vx.detach().cpu().numpy()
+    dvx_dx = torch.gradient(vx, spacing=dx, dim=1)[0]  # x derivative
+    dvy_dy = torch.gradient(vy, spacing=dy, dim=0)[0]  # y derivative
 
-    if isinstance(vy, torch.Tensor):
-        vy = vy.detach().cpu().numpy()
+    return dvx_dx + dvy_dy
 
-    dvx_dx = np.gradient(vx, dx, axis=1)
-    dvy_dy = np.gradient(vy, dy, axis=0)
+def get_vorticity(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
+    """
+    Calculate the vorticity of a 2D vector field (vx, vy).
+    Args:
+        vx: x-component of the vector field (2D tensor)
+        vy: y-component of the vector field (2D tensor)
+        dx: spacing in the x-direction (default in Mm)
+        dy: spacing in the y-direction (default in Mm)
+    Returns:
+        Vorticity of the vector field (2D tensor)
+    """
 
-    return torch.from_numpy(dvx_dx + dvy_dy)
+    
+    if isinstance(vx, np.ndarray):
+        vx = torch.from_numpy(vx)
+    if isinstance(vy, np.ndarray):
+        vy = torch.from_numpy(vy)
 
-def get_vorticity(vx, vy, dx = 0.016 * 1e6, dy = 0.016 * 1e6):
+    dvy_dx = torch.gradient(vy, spacing=dx, dim=1)[0]  # x derivative of vy
+    dvx_dy = torch.gradient(vx, spacing=dy, dim=0)[0]  # y derivative of vx
 
-    if isinstance(vx, torch.Tensor):
-        vx = vx.detach().cpu().numpy()
-
-    if isinstance(vy, torch.Tensor):
-        vy = vy.detach().cpu().numpy()
-
-    dvy_dx = np.gradient(vy, dx, axis=1)
-    dvx_dy = np.gradient(vx, dy, axis=0)
-
-    return torch.from_numpy(dvy_dx - dvx_dy)
+    return dvy_dx - dvx_dy
 
 def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71366346959):
+    """
+    Custom loss function to take into account divergence and vorticity - 
+    compute a combined loss of MSE for velocity, divergence, and vorticity.
     
+    Args:
+        pred: Predicted velocity field (2-channel tensor)
+        gt: Ground truth velocity field (2-channel tensor)
+        alpha1: Weight for velocity MSE
+        alpha2: Weight for divergence MSE
+        alpha3: Weight for vorticity MSE
+    Returns:
+        Combined loss value and individual MSE components
+    """
     mse1 = F.mse_loss(pred, gt)
-    mse2 = F.mse_loss(get_divergence(pred[0], pred[1]), get_divergence(gt[0], gt[1]))
-    mse3 = F.mse_loss(get_vorticity(pred[0], pred[1]), get_vorticity(gt[0], gt[1]))
+    
+    div_pred = get_divergence(pred[0], pred[1])
+    div_gt = get_divergence(gt[0], gt[1])
+    vor_pred = get_vorticity(pred[0], pred[1])
+    vor_gt = get_vorticity(gt[0], gt[1])
+    
+    mse2 = F.mse_loss(div_pred, div_gt)
+    mse3 = F.mse_loss(vor_pred, vor_gt)
 
-    return alpha1 * mse1 + alpha2 * mse2 + alpha3 * mse3
+    return alpha1 * mse1 + alpha2 * mse2 + alpha3 * mse3, mse1, mse2, mse3
 
 def calculate_correlation (original, predicted):
 
