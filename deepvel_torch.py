@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import time
 import matplotlib
 #from prepare_data import normalize_layerwise
-from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map, plot_prediction_and_scatter_full_map_vertical
+from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map_vertical
 from analysis_fn import div_vor_loss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -203,7 +203,7 @@ class DeepVel_run(object):
 
         #self.criterion = nn.MSELoss()
         self.criterion = div_vor_loss
-        self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1=1.0, alpha2=1e10, alpha3=1e10)
+        self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1 = 0, alpha2=1e8, alpha3=1e8)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)    
 
 
@@ -354,7 +354,7 @@ if (__name__ == '__main__'):
     main_root = "/dat/xenoss/"
     ###### NOTE best version ######
 
-    deepvel_net = DeepVel_run(root = main_root, in_channels=4, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{4}/cropped/data_{128}x{128}', network_path = "new_loss_experiments/version_5/checkpoints/")
+    deepvel_net = DeepVel_run(root = main_root, in_channels=4, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{4}/cropped/data_{128}x{128}', network_path = "new_loss_experiments/version_6/checkpoints/")
     deepvel_net.train(80)
 
     ###### NOTE training 5x5 experiments #####

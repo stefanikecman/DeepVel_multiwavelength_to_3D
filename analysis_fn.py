@@ -55,7 +55,7 @@ def get_vorticity(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
 def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71366346959):
     """
     Custom loss function to take into account divergence and vorticity - 
-    compute a combined loss of MSE for velocity, divergence, and vorticity.
+    compute a combined loss of MSE for velocity, divergence and vorticity.
     
     Args:
         pred: Predicted velocity field (2-channel tensor)
