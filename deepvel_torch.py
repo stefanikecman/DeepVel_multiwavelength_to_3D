@@ -202,8 +202,8 @@ class DeepVel_run(object):
             self.summary = summary(self.model, input_size = (self.in_channels, 128, 128), batch_size = self.batch_size) #TODO fix hardcoding 128,128
 
         #self.criterion = nn.MSELoss()
-        self.criterion = div_vor_loss
-        self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1 = 0, alpha2=1e8, alpha3=1e8)
+        #self.criterion = div_vor_loss
+        self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1=1, alpha2=1.384507e-5*1e3, alpha3=1.434438e-05*1e3, normalize=True)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)    
 
 
@@ -223,9 +223,34 @@ class DeepVel_run(object):
 
         scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, gamma = 0.96)
 
+        # Paths for saving MSEs
+        path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_8/"
+        mse1_path = os.path.join(path, "mse1.npy")
+        mse2_path = os.path.join(path, "mse2.npy")
+        mse3_path = os.path.join(path, "mse3.npy")
+
+        # Load existing values if files exist, else start new lists
+        if os.path.exists(mse1_path):
+            mse1_list = list(np.load(mse1_path))
+        else:
+            mse1_list = []
+        
+        if os.path.exists(mse2_path):
+            mse2_list = list(np.load(mse2_path))
+        else:
+            mse2_list = []
+
+        if os.path.exists(mse3_path):
+            mse3_list = list(np.load(mse3_path))
+        else:
+            mse3_list = []
+
         for epoch in range(epochs):
             self.model.train()
             running_loss = 0.0
+            epoch_mse1 = []
+            epoch_mse2 = []
+            epoch_mse3 = []
             for batch_i, (x, y) in enumerate(self.trainloader):
                 self.optimizer.zero_grad()
                 outputs = self.model(x.to(device))
@@ -233,12 +258,15 @@ class DeepVel_run(object):
                 loss_tuple = self.criterion(outputs, y.to(device))
                 if isinstance(loss_tuple, tuple):
                     loss, mse1, mse2, mse3 = loss_tuple
+                    epoch_mse1.append(mse1.item())
+                    epoch_mse2.append(mse2.item())
+                    epoch_mse3.append(mse3.item())
                 else:
                     loss = loss_tuple
                 
                 loss.backward()
 
-                #print("MSE1: ", mse1.item(), " MSE2: ", mse2.item(), " MSE3: ", mse3.item())
+                print("MSE1: ", mse1.item(), " MSE2: ", mse2.item(), " MSE3: ", mse3.item())
 
                 self.optimizer.step()
                 running_loss += loss.item()
@@ -256,6 +284,15 @@ class DeepVel_run(object):
                     )
                 )
             scheduler.step()
+
+            # Save average MSEs for this epoch
+            if epoch_mse1 and epoch_mse2 and epoch_mse3:
+                mse1_list.append(np.mean(epoch_mse1))
+                mse2_list.append(np.mean(epoch_mse2))
+                mse3_list.append(np.mean(epoch_mse3))
+                np.save(mse1_path, mse1_list)
+                np.save(mse2_path, mse2_list)
+                np.save(mse3_path, mse3_list)
 
             val_loss_list = []
             val_acc_list = []
@@ -354,8 +391,8 @@ if (__name__ == '__main__'):
     main_root = "/dat/xenoss/"
     ###### NOTE best version ######
 
-    deepvel_net = DeepVel_run(root = main_root, in_channels=4, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{4}/cropped/data_{128}x{128}', network_path = "new_loss_experiments/version_6/checkpoints/")
-    deepvel_net.train(80)
+    deepvel_net = DeepVel_run(root = main_root, in_channels=4, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{4}/cropped/data_{128}x{128}', network_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_8/checkpoints/")
+    deepvel_net.train(120)
 
     ###### NOTE training 5x5 experiments #####
 

@@ -230,17 +230,17 @@ if (__name__ == '__main__'):
 
 
     ###### NOTE test with the new loss ########
-    # timestep = 4
-    # patch = 128
+    timestep = 4
+    patch = 128
     
-    # deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
-    # params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_6/checkpoints/DeepVel_torch_epoch_77_0.27598.pt'
+    deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
+    params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_7/checkpoints/DeepVel_torch_epoch_79_0.35212.pt'
 
-    # print(f"NEW model: Evaluating model with {timestep} timesteps and patch size {patch}")
-    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_6/test/'
-    # #plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, write_metrics=False, return_metrics=False)
-    # metrics = plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True, title="DeepVel Model with Divergence and Vorticity Loss")
-    # print(metrics)
+    print(f"NEW model: Evaluating model with {timestep} timesteps and patch size {patch}")
+    test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_7/test/'
+    #plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, write_metrics=False, return_metrics=False)
+    metrics = plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True, title="DeepVel Model with Divergence and Vorticity Loss")
+    print(metrics)
 
     # params_model_old = '/dat/xenoss/models_5x5_norm/timestep_4/128x128/DeepVel_torch_epoch_79_0.14127.pt'
     # print(f"OLD model: Evaluating model with {timestep} timesteps and patch size {patch}")
@@ -280,27 +280,27 @@ if (__name__ == '__main__'):
     ##################################################
 
     ######### NOTE plotting top 4 results with titles ##########
-#     params4_128 = '/dat/xenoss/models_5x5_norm/timestep_4/128x128/DeepVel_torch_epoch_79_0.14127.pt'
-#     params8_128 = '/dat/xenoss/models_5x5_norm/timestep_8/128x128/DeepVel_torch_epoch_78_0.14107.pt'
-#     params2_96 = '/dat/xenoss/models_5x5_norm/timestep_2/96x96/DeepVel_torch_epoch_78_0.14897.pt'
-#     params6_128 = '/dat/xenoss/models_5x5_norm/timestep_6/128x128/DeepVel_torch_epoch_78_0.14175.pt'
+    # params4_128 = '/dat/xenoss/models_5x5_norm/timestep_4/128x128/DeepVel_torch_epoch_79_0.14127.pt'
+    # params8_128 = '/dat/xenoss/models_5x5_norm/timestep_8/128x128/DeepVel_torch_epoch_78_0.14107.pt'
+    # params2_96 = '/dat/xenoss/models_5x5_norm/timestep_2/96x96/DeepVel_torch_epoch_78_0.14897.pt'
+    # params6_128 = '/dat/xenoss/models_5x5_norm/timestep_6/128x128/DeepVel_torch_epoch_78_0.14175.pt'
 
-#     timestep = 6
-#     patch = 128    
-#     deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
-#     test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/experiment_5x5_test/top_4_plots_without_intensities/'
+    # timestep = 6
+    # patch = 128    
+    # deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
+    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/experiment_5x5_test/top_4_plots_without_intensities/'
 
-#     plot_prediction_and_scatter_full_map_vertical(
-#     deepvel_object=deepvel_net, 
-#     params_model=params6_128,  
-#     dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
-#     test_save_path=test_save_path, 
-#     name=f"_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", 
-#     n_input_channels=timestep, 
-#     write_metrics=False, 
-#     return_metrics=True, 
-#     title=f"{timestep} Timesteps, Patch Size {patch} x {patch}", 
-#     plot_intensity=False
+    # plot_prediction_and_scatter_full_map_vertical(
+    # deepvel_object=deepvel_net, 
+    # params_model=params6_128,  
+    # dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
+    # test_save_path=test_save_path, 
+    # name=f"_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", 
+    # n_input_channels=timestep, 
+    # write_metrics=False, 
+    # return_metrics=True, 
+    # title=f"{timestep} Timesteps, Patch Size {patch} x {patch}", 
+    # plot_intensity=False
 # )
     ################################################
 

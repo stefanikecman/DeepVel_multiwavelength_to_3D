@@ -52,7 +52,7 @@ def get_vorticity(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
 
     return dvy_dx - dvx_dy
 
-def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71366346959):
+def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71366346959, normalize=False):
     """
     Custom loss function to take into account divergence and vorticity - 
     compute a combined loss of MSE for velocity, divergence and vorticity.
@@ -67,16 +67,24 @@ def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71
         Combined loss value and individual MSE components
     """
     mse1 = F.mse_loss(pred, gt)
-    
-    div_pred = get_divergence(pred[0], pred[1])
-    div_gt = get_divergence(gt[0], gt[1])
-    vor_pred = get_vorticity(pred[0], pred[1])
-    vor_gt = get_vorticity(gt[0], gt[1])
-    
-    mse2 = F.mse_loss(div_pred, div_gt)
-    mse3 = F.mse_loss(vor_pred, vor_gt)
 
-    return alpha1 * mse1 + alpha2 * mse2 + alpha3 * mse3, mse1, mse2, mse3
+    if normalize:
+        v_std = 230181.609375
+    else:
+        v_std = 1.0
+
+    div_pred = get_divergence(pred[0], pred[1]) * v_std
+    div_gt = get_divergence(gt[0], gt[1]) * v_std
+    vor_pred = get_vorticity(pred[0], pred[1]) * v_std
+    vor_gt = get_vorticity(gt[0], gt[1]) * v_std
+
+    # mse2 = F.mse_loss(div_pred, div_gt)
+    # mse3 = F.mse_loss(vor_pred, vor_gt)
+
+    mse2 = F.l1_loss(div_pred, div_gt, reduction='mean')
+    mse3 = F.l1_loss(vor_pred, vor_gt, reduction='mean')
+
+    return alpha1 * mse1 + (alpha2 * mse2 + alpha3 * mse3), alpha1 * mse1, alpha2 * mse2, alpha3 * mse3
 
 def calculate_correlation (original, predicted):
 

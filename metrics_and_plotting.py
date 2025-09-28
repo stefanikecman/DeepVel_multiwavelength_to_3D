@@ -68,12 +68,13 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
 
     vmin = -3 * torch.std(vel_gt) / 1e5
     vmax = -1 * vmin
-    extent = [0, vel_0.shape[1] * 0.016, 0, vel_0.shape[1] * 0.016]
+    extent = [0, vel_0.shape[1] * 0.016, 0, vel_0.shape[0] * 0.016]
     if arrows:
         H, W = vel_0.shape
         X, Y = np.meshgrid(np.arange(H) * 0.016, np.arange(W) * 0.016, indexing='ij')
         step = 17
-        quiver_scale = 20  
+        #quiver_scale = 20  
+        quiver_scale = 40
         quiver_width = 0.02
         quiver_alpha = 0.8
 
@@ -92,8 +93,8 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     im = ax[idx][0].imshow(vel_0.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][0].quiver(
-            X[::step, ::step], Y[::step, ::step],
-            vel_0.T[::step, ::step], vel_1[::step, ::step],
+            Y[::step, ::step], X[::step, ::step],
+            vel_0.T[::step, ::step], vel_1.T[::step, ::step],
             color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
         )
     title_padding = 27
@@ -105,8 +106,8 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     im = ax[idx][1].imshow(vel_1.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][1].quiver(
-            X[::step, ::step], Y[::step, ::step],
-            vel_0[::step, ::step], vel_1[::step, ::step],
+            Y[::step, ::step], X[::step, ::step],
+            vel_0.T[::step, ::step], vel_1.T[::step, ::step],
             color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
         )
     ax[idx][1].set_title('vy - ground truth', pad=title_padding)
@@ -120,7 +121,7 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     im = ax[idx][0].imshow(vel_0_pred.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][0].quiver(
-            X[::step, ::step], Y[::step, ::step],
+            Y[::step, ::step], X[::step, ::step],
             vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
             color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
         )
@@ -132,7 +133,7 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     im = ax[idx][1].imshow(vel_1_pred.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][1].quiver(
-            X[::step, ::step], Y[::step, ::step],
+            Y[::step, ::step], X[::step, ::step],
             vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
             color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
         )
@@ -173,14 +174,9 @@ def plot_test_full_map(deepvel_object, params_model,  dataset_path, test_save_pa
         B = np.load(dataset_path + f"B_{n_input_channels}.npy")
         vz = np.load(dataset_path + f"vz_{n_input_channels}.npy")
 
-
-    if zoomed_in_size != None:
-        #plot the central part zoomed in to that size
-        print(intensity_full_map.shape)
+    if zoomed_in_size is not None:
         _, h_full, w_full = intensity_full_map.shape
         h_zoomed_in, w_zoomed_in = zoomed_in_size
-
-        # new coordinates:
         h1 = (h_full//2 - int(h_zoomed_in / 2)) 
         h2 = (h_full//2 + int(h_zoomed_in / 2))
         w1 = (w_full//2 - int(w_zoomed_in / 2)) 
@@ -190,7 +186,6 @@ def plot_test_full_map(deepvel_object, params_model,  dataset_path, test_save_pa
         B = B[:, h1:h2, w1:w2] if hybrid1 or hybrid2 else None
         vz = vz[:, h1:h2, w1:w2] if hybrid1 or hybrid2 else None
         velocity_to_plot = velocity_full_map[:, h1:h2, w1:w2]
-
     else:
         intensity_to_plot = intensity_full_map
         velocity_to_plot = velocity_full_map
@@ -205,7 +200,12 @@ def plot_test_full_map(deepvel_object, params_model,  dataset_path, test_save_pa
     else:   
         velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
 
-    plot_predictions(intensity_to_plot, velocity_to_plot, velocity_pred, test_save_path, name, plot_intensity = plot_intensity, arrows = arrows)
+    plot_predictions(
+        intensity_to_plot, velocity_to_plot, velocity_pred,
+        test_save_path, name,
+        plot_intensity=plot_intensity,
+        arrows=arrows
+    )
     plot_scatter_plot(velocity_to_plot, velocity_pred, test_save_path, 'scatter_'+name)
 
     divergence_orig = get_divergence(velocity_to_plot[0].cpu().numpy(), velocity_to_plot[1].cpu().numpy())
@@ -218,9 +218,11 @@ def plot_test_full_map(deepvel_object, params_model,  dataset_path, test_save_pa
     mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
 
     if return_metrics:
-        return {"mse": mse_l, "rmse": rmse_l, "pearson_vx": pearson0, "pearson_vy": pearson1, "slope_vx": slope_x, "slope_vy": slope_y, 
-                "mse_divergence": mse_d, "rmse_divergence": rmse_d, "pearson_divergence": pearson_d, "slope_divergence": slope_d,
-                "mse_vorticity": mse_v, "rmse_vorticity": rmse_v, "pearson_vorticity": pearson_v, "slope_vorticity": slope_v}
+        return {
+            "mse": mse_l, "rmse": rmse_l, "pearson_vx": pearson0, "pearson_vy": pearson1, "slope_vx": slope_x, "slope_vy": slope_y, 
+            "mse_divergence": mse_d, "rmse_divergence": rmse_d, "pearson_divergence": pearson_d, "slope_divergence": slope_d,
+            "mse_vorticity": mse_v, "rmse_vorticity": rmse_v, "pearson_vorticity": pearson_v, "slope_vorticity": slope_v
+        }
 
 
 def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filename, plotting_dim = None, zoom_out = 0):
@@ -311,7 +313,7 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         B = np.load(dataset_path + f"B_{n_input_channels}.npy")
         vz = np.load(dataset_path + f"vz_{n_input_channels}.npy")
 
-    extent = [0, velocity_full_map.shape[1]*0.016, 0, velocity_full_map.shape[1]*0.016]
+    extent = [0, velocity_full_map.shape[1]*0.016, 0, velocity_full_map.shape[0]*0.016]
 
     if zoomed_in_size != None:
         #plot the central part zoomed in to that size
