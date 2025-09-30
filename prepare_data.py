@@ -531,7 +531,7 @@ if (__name__ == '__main__'):
     
     main_root = "/dat/xenoss/"
 
-    create_test_data_5x5_experiments_hybrid()
+    #create_test_data_5x5_experiments_hybrid()
     # I = os.listdir(main_root + "datasets_5x5_experiments/normalized/timestep_4/cropped/data_128x128/inputs/")
     # print("Number of I files: ", len(I))
     # B = os.listdir(main_root + "datasets_5x5_experiments/normalized/timestep_4/cropped/data_128x128/B/")
@@ -628,3 +628,28 @@ if (__name__ == '__main__'):
     # generate_data_5x5_experiments(70000, np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_intensities_normalized.npy'),
     #                                np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_velocities_x_normalized.npy'),
     #                                np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_velocities_y_normalized.npy'))
+
+
+    ######## NOTE CREATE TEST DATASET FOR 4X128X128 #############
+    # main_path = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/"
+    # I = np.load(main_path + "stacked_intensities_normalized.npy")
+    # vx = np.load(main_path + "stacked_velocities_x_normalized.npy")
+    # vy = np.load(main_path + "stacked_velocities_y_normalized.npy")
+    # I = I[-61:, :, :]
+    # vx = vx[-61:, :, :]
+    # vy = vy[-61:, :, :]
+
+    # num_samples = I.shape[0] - 3  # 61 - 4 + 1
+    # for idx in range(num_samples):
+    #     I_4 = I[idx:idx+4, :, :]
+    #     vx_4 = vx[idx:idx+4, :, :]
+    #     vy_4 = vy[idx:idx+4, :, :]
+
+    #     vx_middle = vx_4[1:3, :, :]
+    #     vy_middle = vy_4[1:3, :, :]
+    #     velocities = np.stack([
+    #         (vx_middle[0] + vx_middle[1]) / 2,
+    #         (vy_middle[0] + vy_middle[1]) / 2
+    #     ], axis=0)
+    #     np.save(main_path + f"test_4x128x128/inputs/intensities_{idx}.npy", I_4)
+    #     np.save(main_path + f"test_4x128x128/labels/velocities_{idx}.npy", velocities)

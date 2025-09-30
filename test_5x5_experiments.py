@@ -15,12 +15,13 @@ import csv
 #from prepare_data import normalize_layerwise
 from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map_vertical
 from deepvel_torch import DeepVel_run
+#from deepvel_torch_loss9 import DeepVel_run
 from hybrid_deepvel_torch import DeepVel_run as DeepVel_run_hybrid
 from hybrid_deepvel_torch_v2 import DeepVel_run as DeepVel_run_hybrid2
 import pandas as pd
 import seaborn as sb
 from scipy.stats import norm
-from analysis_fn import get_divergence, get_vorticity
+from analysis_fn import get_all_metrics, get_divergence, get_vorticity
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -234,19 +235,20 @@ if (__name__ == '__main__'):
     patch = 128
     
     deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
-    params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_7/checkpoints/DeepVel_torch_epoch_79_0.35212.pt'
+    # params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_9/checkpoints/DeepVel_torch_epoch_119_7.48748.pt'
 
-    print(f"NEW model: Evaluating model with {timestep} timesteps and patch size {patch}")
-    test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_7/test/'
-    #plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, write_metrics=False, return_metrics=False)
-    metrics = plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True, title="DeepVel Model with Divergence and Vorticity Loss")
-    print(metrics)
+    # print(f"NEW model: Evaluating model with {timestep} timesteps and patch size {patch}")
+    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/new_loss_experiments/version_9/test/'
+    # #plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, write_metrics=False, return_metrics=False)
+    # metrics = plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_div_vor, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True, title="DeepVel Model with Divergence and Vorticity Loss")
+    # print(metrics)
 
-    # params_model_old = '/dat/xenoss/models_5x5_norm/timestep_4/128x128/DeepVel_torch_epoch_79_0.14127.pt'
+    # params_model_old = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/checkpoints/DeepVel_torch_epoch_193_0.13985.pt'
     # print(f"OLD model: Evaluating model with {timestep} timesteps and patch size {patch}")
-    # test_save_path = None
-    # plot_prediction_and_scatter_full_map_vertical(timestep, deepvel_net, params_model_old, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, write_metrics=False, return_metrics=False)
-    # metrics = plot_prediction_and_scatter_full_map_vertical(timestep, deepvel_net, params_model_old, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True)
+    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/test/'
+    # #test_save_path = None
+    # plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_old, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_with_I_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity=False, write_metrics=False, return_metrics=False)
+    # metrics = plot_prediction_and_scatter_full_map_vertical(deepvel_net, params_model_old, dataset_path = main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/', test_save_path=test_save_path, name = f"new_loss_experiment_5x5_not_zoomed_in_full_map_t{timestep}_p{patch}", n_input_channels=timestep, plot_intensity = False, write_metrics=False, return_metrics=True, title="DeepVel Model trained on 200 epochs")
     # print(metrics)
 
     ##########################################
@@ -305,21 +307,66 @@ if (__name__ == '__main__'):
     ################################################
 
     ######### NOTE plotting hybrid model test results with arrows ##########
-    timestep = 4
-    patch = 128
+    # timestep = 4
+    # patch = 128
 
-    deepvel_net = DeepVel_run_hybrid(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
-    params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/checkpoints/DeepVel_torch_epoch_79_0.05759.pt'
-    test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/test'
-    plot_test_full_map(deepvel_object=deepvel_net, 
-                       params_model=params_model_div_vor,  
-                       dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
-                       test_save_path=test_save_path,
-                       name=f"arrows_hybrid_model_v1_full_map_t{timestep}_p{patch}",
-                       zoomed_in_size=(240, 240),
-                       plot_intensity=False,
-                       n_input_channels=timestep,
-                       arrows=True,
-                       hybrid1=True,
-                       hybrid2=False,
-                       return_metrics=False)
+    # deepvel_net = DeepVel_run_hybrid(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
+    # params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/checkpoints/DeepVel_torch_epoch_79_0.05759.pt'
+    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/test'
+    # plot_test_full_map(deepvel_object=deepvel_net, 
+    #                    params_model=params_model_div_vor,  
+    #                    dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
+    #                    test_save_path=test_save_path,
+    #                    name=f"arrows_hybrid_model_v1_full_map_t{timestep}_p{patch}",
+    #                    zoomed_in_size=(240, 240),
+    #                    plot_intensity=False,
+    #                    n_input_channels=timestep,
+    #                    arrows=True,
+    #                    hybrid1=True,
+    #                    hybrid2=False,
+    #                    return_metrics=False)
+
+#### NOTE full testing to get average metrics ##########
+
+    # timestep = 4
+    # patch = 128
+    # main_path = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/test_4x128x128/"
+    # deepvel_net = DeepVel_run(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
+    # params_model_old = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/checkpoints/DeepVel_torch_epoch_193_0.13985.pt'
+    # test_inputs = os.listdir(main_path + "inputs/")
+    # test_inputs.sort()
+    # test_labels = os.listdir(main_path + "labels/")
+    # test_labels.sort()
+
+    # mse = 0
+    # rmse = 0
+    # pearson_vx = 0
+    # pearson_vy = 0
+    # slope_vx = 0
+    # slope_vy = 0
+
+    # for i in range(len(test_inputs)):
+    #     input_data = np.load(main_path + "inputs/" + test_inputs[i])
+    #     label_data = np.load(main_path + "labels/" + test_labels[i])
+    #     label_data = torch.from_numpy(label_data).float().to(device)
+    #     if test_inputs[i].split("_")[-1] != test_labels[i].split("_")[-1]:
+    #         print("Input and label files do not match!")
+    #         continue
+    #     vel_pred = deepvel_net.predict(input_data, params_model_old)
+    #     metrics = get_all_metrics(label_data, vel_pred)
+    #     mse += metrics["mse"]
+    #     rmse += metrics["rmse"]
+    #     pearson_vx += metrics["pearson_vx"]
+    #     pearson_vy += metrics["pearson_vy"]
+    #     slope_vx += metrics["slope_vx"]
+    #     slope_vy += metrics["slope_vy"]
+    #     with open("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/test/logs.txt", "a") as log_file:
+    #         log_file.write(f"Processed {i+1}/{len(test_inputs)}: {test_inputs[i]}, MSE: {metrics['mse']}, RMSE: {metrics['rmse']}, Pearson vx: {metrics['pearson_vx']}, Pearson vy: {metrics['pearson_vy']}, Slope vx: {metrics['slope_vx']}, Slope vy: {metrics['slope_vy']}\n")
+    #     print(f"Processed {i+1}/{len(test_inputs)}: {test_inputs[i]}, MSE: {metrics['mse']}, RMSE: {metrics['rmse']}, Pearson vx: {metrics['pearson_vx']}, Pearson vy: {metrics['pearson_vy']}, Slope vx: {metrics['slope_vx']}, Slope vy: {metrics['slope_vy']}")
+        
+    # n = len(test_inputs)
+    # avg_metrics = f"Average MSE: {mse/n}, RMSE: {rmse/n}, Pearson vx: {pearson_vx/n}, Pearson vy: {pearson_vy/n}, Slope vx: {slope_vx/n}, Slope vy: {slope_vy/n}\n"
+    # print(avg_metrics)
+
+    # with open("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/test/logs.txt", "a") as log_file:
+    #     log_file.write(avg_metrics)

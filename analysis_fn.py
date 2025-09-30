@@ -86,6 +86,38 @@ def div_vor_loss(pred, gt, alpha1=1.0, alpha2=72227.87605985379, alpha3=69713.71
 
     return alpha1 * mse1 + (alpha2 * mse2 + alpha3 * mse3), alpha1 * mse1, alpha2 * mse2, alpha3 * mse3
 
+def div_vor_loss_norm(pred, gt, mean_gt_div, std_gt_div, mean_gt_vor, std_gt_vor):
+    """
+    Custom loss function to take into account divergence and vorticity - 
+    compute a combined loss of MSE for velocity, divergence and vorticity.
+    
+    Args:
+        pred: Predicted velocity field (2-channel tensor)
+        gt: Ground truth velocity field (2-channel tensor)
+        mean_gt_div: Mean of the ground truth divergence for normalization
+        std_gt_div: Standard deviation of the ground truth divergence for normalization
+        mean_gt_vor: Mean of the ground truth vorticity for normalization
+        std_gt_vor: Standard deviation of the ground truth vorticity for normalization
+    Returns:
+        Combined loss value and individual MSE components
+    """
+    mse1 = F.mse_loss(pred, gt)
+
+
+    div_pred = get_divergence(pred[0], pred[1])
+    div_gt = get_divergence(gt[0], gt[1])
+    vor_pred = get_vorticity(pred[0], pred[1])
+    vor_gt = get_vorticity(gt[0], gt[1])
+
+    div_pred = (div_pred - mean_gt_div) / std_gt_div
+    div_gt = (div_gt - mean_gt_div) / std_gt_div
+    vor_pred = (vor_pred - mean_gt_vor) / std_gt_vor
+    vor_gt = (vor_gt - mean_gt_vor) / std_gt_vor
+
+    mse2 = F.mse_loss(div_pred, div_gt) 
+    mse3 = F.mse_loss(vor_pred, vor_gt) 
+    return  mse1 + mse2 + mse3, mse1, mse2, mse3
+
 def calculate_correlation (original, predicted):
 
     '''
