@@ -354,7 +354,7 @@ if (__name__ == '__main__'):
     ###### NOTE best version ######
 
     deepvel_net = DeepVel_run(root = main_root, in_channels=4, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{4}/cropped/data_{128}x{128}', network_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/checkpoints/")
-    deepvel_net.train(200)
+    deepvel_net.train(80)
 
     ###### NOTE training 5x5 experiments #####
 

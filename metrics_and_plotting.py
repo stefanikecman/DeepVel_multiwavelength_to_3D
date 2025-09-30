@@ -66,16 +66,15 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     vel_0_pred = vel_pred[0, :, :].cpu().numpy()
     vel_1_pred = vel_pred[1, :, :].cpu().numpy()
 
-    vmin = -3 * torch.std(vel_gt) / 1e5
+    vmin = -3 * torch.std(vel_gt)
     vmax = -1 * vmin
     extent = [0, vel_0.shape[1] * 0.016, 0, vel_0.shape[0] * 0.016]
     if arrows:
         H, W = vel_0.shape
         X, Y = np.meshgrid(np.arange(H) * 0.016, np.arange(W) * 0.016, indexing='ij')
         step = 17
-        #quiver_scale = 20  
-        quiver_scale = 40
-        quiver_width = 0.02
+        quiver_scale = 10
+        quiver_width = 0.01
         quiver_alpha = 0.8
 
 
@@ -90,25 +89,29 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
         idx += 1
 
     # Ground truth
-    im = ax[idx][0].imshow(vel_0.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
+    im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][0].quiver(
             Y[::step, ::step], X[::step, ::step],
             vel_0.T[::step, ::step], vel_1.T[::step, ::step],
-            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
-        )
+            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha,
+            #headwidth=6, headlength=8, headaxislength=6.5,
+            headwidth=2, headlength=3, headaxislength=2,
+            scale_units='xy')
     title_padding = 27
     ax[idx][0].set_title('vx - ground truth', pad=title_padding)
     divider = make_axes_locatable(ax[idx][0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(im, cax=cax)
 
-    im = ax[idx][1].imshow(vel_1.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
+    im = ax[idx][1].imshow(vel_1.T, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][1].quiver(
             Y[::step, ::step], X[::step, ::step],
             vel_0.T[::step, ::step], vel_1.T[::step, ::step],
-            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
+            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha,
+            headwidth=2, headlength=3, headaxislength=2,
+            scale_units='xy'
         )
     ax[idx][1].set_title('vy - ground truth', pad=title_padding)
     divider = make_axes_locatable(ax[idx][1])
@@ -118,24 +121,28 @@ def plot_predictions(int_gt, vel_gt, vel_pred, path_save, filename, plot_intensi
     idx += 1
 
     # Predicted
-    im = ax[idx][0].imshow(vel_0_pred.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
+    im = ax[idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][0].quiver(
             Y[::step, ::step], X[::step, ::step],
             vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
-            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
+            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha,
+            headwidth=2, headlength=3, headaxislength=2,
+            scale_units='xy'
         )
     ax[idx][0].set_title('vx - predicted', pad=title_padding)
     divider = make_axes_locatable(ax[idx][0])
     cax = divider.append_axes("right", size="5%", pad=0.05)
     cbar = plt.colorbar(im, cax=cax)
 
-    im = ax[idx][1].imshow(vel_1_pred.T / 1e5, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
+    im = ax[idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin=vmin, vmax=vmax, origin='lower', extent=extent)
     if arrows:
         ax[idx][1].quiver(
             Y[::step, ::step], X[::step, ::step],
             vel_0_pred.T[::step, ::step], vel_1_pred.T[::step, ::step],
-            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha
+            color='k', scale=quiver_scale, width=quiver_width, alpha=quiver_alpha,
+            headwidth= 2, headlength=3, headaxislength=2,
+            scale_units='xy'
         )
     ax[idx][1].set_title('vy - predicted', pad=title_padding)
     divider = make_axes_locatable(ax[idx][1])

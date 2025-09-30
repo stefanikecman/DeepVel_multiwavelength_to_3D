@@ -148,7 +148,7 @@ def plot_histograms_div_vor(div_original, vor_original, div_pred, vor_pred, outp
 
 if (__name__ == '__main__'):
 
-
+    #note: some old plotting commands might not work due to refactoring of plotting methods
     main_root = "/dat/xenoss/"
 
     ###### NOTE create heatmaps ######
@@ -307,24 +307,24 @@ if (__name__ == '__main__'):
     ################################################
 
     ######### NOTE plotting hybrid model test results with arrows ##########
-    # timestep = 4
-    # patch = 128
+    timestep = 4
+    patch = 128
 
-    # deepvel_net = DeepVel_run_hybrid(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
-    # params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/checkpoints/DeepVel_torch_epoch_79_0.05759.pt'
-    # test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/test'
-    # plot_test_full_map(deepvel_object=deepvel_net, 
-    #                    params_model=params_model_div_vor,  
-    #                    dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
-    #                    test_save_path=test_save_path,
-    #                    name=f"arrows_hybrid_model_v1_full_map_t{timestep}_p{patch}",
-    #                    zoomed_in_size=(240, 240),
-    #                    plot_intensity=False,
-    #                    n_input_channels=timestep,
-    #                    arrows=True,
-    #                    hybrid1=True,
-    #                    hybrid2=False,
-    #                    return_metrics=False)
+    deepvel_net = DeepVel_run_hybrid(root = main_root, in_channels=timestep, batch = 64, dataset_path = main_root + f'datasets_5x5_experiments/normalized/timestep_{timestep}/cropped/data_{patch}x{patch}', network_path = main_root + f'models_5x5_norm/timestep_{timestep}/{patch}x{patch}/')
+    params_model_div_vor = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/checkpoints/DeepVel_torch_epoch_79_0.05759.pt'
+    test_save_path = '/home/xenoss/data/kecman_project/DeepVel_3D_velocity/hybrid_model/mse_loss/test'
+    plot_test_full_map(deepvel_object=deepvel_net, 
+                       params_model=params_model_div_vor,  
+                       dataset_path=main_root + f'datasets_5x5_experiments/main_dataset_test/normalized/',
+                       test_save_path=test_save_path,
+                       name=f"arrows_hybrid_model_v1_full_map_t{timestep}_p{patch}",
+                       zoomed_in_size=(240, 240),
+                       plot_intensity=False,
+                       n_input_channels=timestep,
+                       arrows=True,
+                       hybrid1=True,
+                       hybrid2=False,
+                       return_metrics=False)
 
 #### NOTE full testing to get average metrics ##########
 
