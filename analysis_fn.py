@@ -8,7 +8,7 @@ from scipy.stats import linregress
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def get_divergence(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
+def get_divergence(vx, vy, vz= None, dx=0.016 * 1e6, dy=0.016 * 1e6, dz=0.016 * 1e6):
     """
     Calculate the divergence of a 2D vector field (vx, vy).
     Args:
@@ -23,13 +23,18 @@ def get_divergence(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
         vx = torch.from_numpy(vx)
     if isinstance(vy, np.ndarray):
         vy = torch.from_numpy(vy)
+    # if vz is not None and isinstance(vz, np.ndarray):
+    #     vz = torch.from_numpy(vz)
 
-    dvx_dx = torch.gradient(vx, spacing=dx, dim=1)[0]  # x derivative
-    dvy_dy = torch.gradient(vy, spacing=dy, dim=0)[0]  # y derivative
+    dvx_dx = torch.gradient(vx, spacing=dx, dim=1)[0]
+    dvy_dy = torch.gradient(vy, spacing=dy, dim=0)[0]
 
+    # if vz is not None:
+    #     dvz_dz = torch.gradient(vz, spacing=dz, dim=0)[0]
+    #     return dvx_dx + dvy_dy + dvz_dz
     return dvx_dx + dvy_dy
 
-def get_vorticity(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
+def get_vorticity(vx, vy, vz = None, dx=0.016 * 1e6, dy=0.016 * 1e6, dz=0.016 * 1e6):
     """
     Calculate the vorticity of a 2D vector field (vx, vy).
     Args:
@@ -47,8 +52,22 @@ def get_vorticity(vx, vy, dx=0.016 * 1e6, dy=0.016 * 1e6):
     if isinstance(vy, np.ndarray):
         vy = torch.from_numpy(vy)
 
-    dvy_dx = torch.gradient(vy, spacing=dx, dim=1)[0]  # x derivative of vy
-    dvx_dy = torch.gradient(vx, spacing=dy, dim=0)[0]  # y derivative of vx
+    dvy_dx = torch.gradient(vy, spacing=dx, dim=1)[0]
+    dvx_dy = torch.gradient(vx, spacing=dy, dim=0)[0]
+
+    # if vz is not None:
+    #     if isinstance(vz, np.ndarray):
+    #         vz = torch.from_numpy(vz)
+    #     dvz_dy = torch.gradient(vz, spacing=dy, dim=0)[0]
+    #     dvz_dx = torch.gradient(vz, spacing=dx, dim=1)[0]
+    #     dvy_dz = torch.gradient(vy, spacing=dz, dim=0)[0]
+    #     dvx_dz = torch.gradient(vx, spacing=dz, dim=0)[0]
+
+    #     vorticity_x = dvz_dy - dvy_dz
+    #     vorticity_y = dvx_dz - dvz_dx
+    #     vorticity_z = dvy_dx - dvx_dy
+
+    #     return torch.stack((vorticity_x, vorticity_y, vorticity_z), dim=0)
 
     return dvy_dx - dvx_dy
 
@@ -138,13 +157,13 @@ def calculate_correlation (original, predicted):
     n_channels = original.shape[0]
 
     for ch in range(n_channels):
-        pearson_coeffs.append(stats.pearsonr(original[0, :, :].flatten(), predicted[0, :, :].flatten()))
+        pearson_coeffs.append(stats.pearsonr(original[ch, :, :].flatten(), predicted[ch, :, :].flatten()).statistic.item())
 
     return pearson_coeffs
 
 def get_all_metrics(original, predicted, is_divergence=False):
     """
-    Calculate metrics for either velocity fields (2 channels) or divergence/vorticity (1 channel)
+    Calculate metrics for either velocity fields (2 or 3 channels) or divergence/vorticity (1 channel)
     Args:
         original: Original data tensor
         predicted: Predicted data tensor
@@ -173,15 +192,32 @@ def get_all_metrics(original, predicted, is_divergence=False):
 
         slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(orig_0.flatten(), pred_0.flatten())
         slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(orig_1.flatten(), pred_1.flatten())
+
+        if original.shape[0] == 3:
+            orig_2 = original[2, :, :].cpu().numpy()
+            pred_2 = predicted[2, :, :].cpu().numpy()
+            slope_z, intercept_z, r_value_z, p_value_z, std_err_z = linregress(orig_2.flatten(), pred_2.flatten())
+
+            pearson0, pearson1, pearson2 = calculate_correlation(original, predicted)
+
+            return {
+            "mse": mse_l.item(), 
+            "rmse": rmse_l.item(),
+            "pearson_vx": pearson0,
+            "pearson_vy": pearson1,
+            "pearson_vz": pearson2,
+            "slope_vx": slope_x,
+            "slope_vy": slope_y,
+            "slope_vz": slope_z
+        }
+
         pearson0, pearson1 = calculate_correlation(original, predicted)
-        pearson0 = pearson0.statistic
-        pearson1 = pearson1.statistic
 
         return {
             "mse": mse_l.item(), 
             "rmse": rmse_l.item(),
-            "pearson_vx": pearson0.item(),
-            "pearson_vy": pearson1.item(),
+            "pearson_vx": pearson0,
+            "pearson_vy": pearson1,
             "slope_vx": slope_x,
             "slope_vy": slope_y
         }

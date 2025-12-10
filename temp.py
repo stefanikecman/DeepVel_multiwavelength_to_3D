@@ -11,28 +11,28 @@ from analysis_fn import get_divergence, get_vorticity
 # data = muram.MuramTauSlice(path,iter,1.0)
 # print(type(data.vz.T/1e5))
 
-# with open("/home/xenoss/data/kecman_project/DeepVel_3D_velocity/best_model_200_epochs/checkpoints/deepvel_torch_train_params_09_30_2025_15_22_01.npy", "rb") as f:
-#     params_dict = np.load(f, allow_pickle=True).item()
-#     save_losses = np.load(f, allow_pickle=True)
+with open("/home/xenoss/dat/thesis/models/models_v1/hybrid_model/checkpoints/deepvel_torch_train_params_12_06_2025_15_22_52.npy", "rb") as f:
+    params_dict = np.load(f, allow_pickle=True).item()
+    save_losses = np.load(f, allow_pickle=True)
 
-# #print(save_losses)
-# print (save_losses.shape)
+#print(save_losses)
+print (save_losses.shape)
 
-# x = save_losses[:,0].tolist()
-# train_loss = np.sqrt(save_losses[:,1].tolist())
-# val_loss = np.sqrt(save_losses[:,2].tolist())
+x = save_losses[:,0].tolist()
+train_loss = np.sqrt(save_losses[:,1].tolist())
+val_loss = np.sqrt(save_losses[:,2].tolist())
 
-# plt.figure(figsize=(10, 6))
-# plt.rcParams['font.size'] = 17
-# plt.plot(x, train_loss, label='train loss')
-# plt.plot(x, val_loss, label='val loss')
-# #plt.yscale('log')
-# plt.xlabel('Epochs')
-# plt.ylabel('Loss (RMSE)')
-# plt.title('Training and Validation Loss Curves')
-# plt.legend()
-# #plt.grid(True)
-# plt.savefig('training_validation_loss_best_200.png')
+plt.figure(figsize=(10, 6))
+plt.rcParams['font.size'] = 17
+plt.plot(x, train_loss, label='train loss')
+plt.plot(x, val_loss, label='val loss')
+#plt.yscale('log')
+plt.xlabel('Epochs')
+plt.ylabel('Loss (RMSE)')
+plt.title('Hybrid Stokes IV model - Training and Validation Loss Curves')
+plt.legend()
+#plt.grid(True)
+plt.savefig('/home/xenoss/dat/thesis/models/models_v1/hybrid_model/training_validation_loss_hybrid.png')
 # plt.show()
 
 # data_cube_vx = np.load("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_velocities_x_normalized.npy")

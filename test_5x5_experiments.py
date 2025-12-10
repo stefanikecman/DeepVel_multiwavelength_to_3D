@@ -17,7 +17,7 @@ from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scat
 from deepvel_torch import DeepVel_run
 #from deepvel_torch_loss9 import DeepVel_run
 from hybrid_deepvel_torch import DeepVel_run as DeepVel_run_hybrid
-from hybrid_deepvel_torch_v2 import DeepVel_run as DeepVel_run_hybrid2
+from DeepVel_3D_velocity.hybrid_deepvel_torch import DeepVel_run as DeepVel_run_hybrid2
 import pandas as pd
 import seaborn as sb
 from scipy.stats import norm

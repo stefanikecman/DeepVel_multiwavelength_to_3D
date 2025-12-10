@@ -11,6 +11,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 import random
 import shutil
 import muram as mio
+import astropy.io.fits as fits
+import scipy.interpolate as sci
 
 main_path = "/dat/milic/2D/"
 intensities_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/intensities/"
@@ -526,130 +528,220 @@ def create_test_data_5x5_experiments(main_dataset_path = "/dat/xenoss/datasets_5
     # np.save(main_dataset + 'stacked_intensities_normalized.npy', intensity_norm)
     # np.save(main_dataset + 'stacked_velocities_x_normalized.npy', vx_norm)
     # np.save(main_dataset + 'stacked_velocities_y_normalized.npy', vy_norm)
+def get_doppler_width(temperature, central_wavelength, atomic_mass):
+    '''
+    Calculate the Doppler width for a given temperature, central wavelength, and atomic mass.
+
+    Args:
+        temperature: Temperature in Kelvin
+        central_wavelength: Central wavelength in Angstroms
+        atomic_mass: Atomic mass in atomic mass units (amu) 
+    Returns:
+        Doppler width in Angstroms
+    '''
+    k_B = 1.380649e-16  # Boltzmann constant in erg/K
+    c = 2.99792458e10   # Speed of light in cm/s
+    m_u = 1.66053906660e-24  # Atomic mass unit in grams
+    atomic_mass_g = atomic_mass * m_u  # Convert atomic mass to grams
+    doppler_width = central_wavelength * 1e-8 / c * np.sqrt(2 * k_B * temperature / atomic_mass_g)  # Doppler width in cm
+    doppler_width_angstrom = doppler_width * 1e8  # Convert Doppler width to Angstroms
+    return doppler_width_angstrom
+
+def log_sampling(central_wavelengths, doppler_widths, n_samples = 12, m_min=0.05, m_max=3.0):
+
+    one_side = n_samples // 2
+    log_space = np.logspace(np.log10(m_min), np.log10(m_max), one_side)
+    offsets = np.concatenate((-log_space[::-1], [0.0], log_space))
+    logspacing = np.array([central_wavelengths[i] + doppler_widths[i] * offsets for i in range(len(central_wavelengths))])
+
+    new_wave_grid = [logspacing[i] for i in range(len(logspacing))]
+    
+    return new_wave_grid
+
+def create_dummy_datacubes(murampath = '/dat/milic/2D', snapi_path = '/dat/milic/3D/3D_snapi_spectra/', tau = 0.1, save_path = '/home/xenoss/dat/thesis/dataset/'):
+    '''
+    Creates full maps for dummy data:
+
+    - Stokes I, V cubes go from 0 - 4500 iteration, every 150 iterations (i.e. cadence 30s)
+    - Velocity will have the same cadence and go also (in general)from 0 - 4500 iteration
+    - Since the velocities are calculated for the middle of the interval, if for the input it is taken 0 and 150 iteration, 
+    then the velocity is calculated in the middle of 50 and 100 (because it is the closest to the middle of the input interval)
+    '''
+
+    # INPUTS - NO DOWNSAMPLING
+    print("Generating inputs...")
+    # input_indices1 = np.arange(0,4500,150)
+    # input_indices2 = np.arange(150,4650,150)
+    input_data_i, input_data_v = [], []
+    # for i in range(len(input_indices1)):
+    #     input1 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices1[i]}.fits'))[0].data
+    #     input2 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices2[i]}.fits'))[0].data
+
+    #     stokes_I1 = input1[:, :, 0, :]
+    #     stokes_V1 = input1[:, :, 1, :]
+    #     stokes_I2 = input2[:, :, 0, :]
+    #     stokes_V2 = input2[:, :, 1, :]
+
+    #     I1_t = np.transpose(stokes_I1, (2, 0, 1))  
+    #     I2_t = np.transpose(stokes_I2, (2, 0, 1))  
+    #     input_I = np.stack([I1_t, I2_t], axis=0)
+
+    #     V1_t = np.transpose(stokes_V1, (2, 0, 1))
+    #     V2_t = np.transpose(stokes_V2, (2, 0, 1))
+    #     input_V = np.stack([V1_t, V2_t], axis=0)
+
+    #     np.save(os.path.join(save_path, 'inputs/stokes_I', f'stokesI_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_I))
+    #     np.save(os.path.join(save_path, 'inputs/stokes_V', f'stokesV_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_V))
+
+    #DOWNSAMPLE INPUT CUBES
+    # pick n points and do log sampling with the n points on one side and symmetrical on the other. then round the logs up so i dont have to interpolate
+    print("Downsampling inputs...")
+
+    #LOG SAMPLING IN INDICES
+
+    # h, w, c, l = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_0.fits'))[0].data.shape
+    # n_samples = [21,11,11]
+    # line_centers = [269, 542, 586]
+    # line_widths = [250, 50, 50]
+    # indices = [np.logspace(np.log10(1), np.log10(line_widths[i]//2), n_samples[i]//2) for i in range(len(n_samples))]
+    # indices = [np.round(ind).astype(int) for ind in indices]
+    # offsets = [np.concatenate((-ind[::-1], [0], ind)) for ind in indices]
+    # individual_grids = [offsets[i] + line_centers[i] for i in range(len(line_centers))] 
+    # new_index_grid = [np.clip(ig, 0, l-1) for ig in individual_grids]
+    # np.save(os.path.join(save_path, 'inputs/downsampled_cubes/used_indices', f'indices_downsampled'), np.concatenate(new_index_grid))
+    
+    # for i in range(0, 4650, 150):
+    #     input_data = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{i}.fits'))[0].data
+
+    #     #sample logarithmically around the centers of the spectral lines
+    #     stokes_I = input_data[:, :, 0, :]
+    #     stokes_V = input_data[:, :, 1, :]
+    #     stokes_I_g, stokes_V_g = [], []
+
+    #     for g in new_index_grid:
+    #         stokes_I_g.append(stokes_I[:, :, g])
+    #         stokes_V_g.append(stokes_V[:, :, g])
+       
+    #     stokes_I_d = np.concatenate(stokes_I_g, axis=2)
+    #     stokes_V_d = np.concatenate(stokes_V_g, axis=2)
+
+    #     I_t = np.transpose(stokes_I_d, (2, 0, 1))  
+    #     V_t = np.transpose(stokes_V_d, (2, 0, 1)) 
+    #     np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_I', f'stokesI_{i}_downsampled'), I_t)
+    #     np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_V', f'stokesV_{i}_downsampled'), V_t)
+        
+    #     input_data_i.append(I_t)
+    #     input_data_v.append(V_t)
+
+    # I_save = np.stack(input_data_i, axis=0)
+    # V_save = np.stack(input_data_v, axis=0)
+    # np.save(os.path.join(save_path, 'stacked/denorm/stacked_inputs_i_light_log.npy'), I_save)
+    # np.save(os.path.join(save_path, 'stacked/denorm/stacked_inputs_v_light_log.npy'), V_save)
+
+    # OUTPUTS
+    # print("Generating labels...")
+    # v1_iters = np.arange(50, 4550, 150)
+    # v2_iters = np.arange(100, 4600, 150)
+
+    # vel_data = []
+    # for i in range(len(v1_iters)):
+    #     v1_idx = v1_iters[i]
+    #     v2_idx = v2_iters[i]
+
+    #     muram_v1 = mio.MuramTauSlice(murampath, v1_idx, tau)
+    #     muram_v2 = mio.MuramTauSlice(murampath, v2_idx, tau)
+
+    #     vx1 = muram_v1.vy[::2,::2]
+    #     vy1 = muram_v1.vz[::2,::2]
+    #     vz1 = muram_v1.vx[::2,::2]
+
+    #     vx2 = muram_v2.vy[::2,::2]
+    #     vy2 = muram_v2.vz[::2,::2]
+    #     vz2 = muram_v2.vx[::2,::2]
+
+    #     vx = (vx1 + vx2) / 2.
+    #     vy = (vy1 + vy2) / 2.
+    #     vz = (vz1 + vz2) / 2.
+
+    #     v_out = np.stack([vx, vy, vz], axis=0)
+    #     np.save(os.path.join(save_path, 'labels', f'vel_{v1_idx}_{v2_idx}.npy'), v_out)
+    #     vel_data.append(v_out)
+    # vel_data = np.stack(vel_data, axis=0)
+    # np.save(os.path.join(save_path, 'stacked/denorm/stacked_velocities.npy'), vel_data)
+
+    #NORMALIZE DATA AND SAVE STATS
+    print("Normalizing data...")
+    input_data_i = np.load(os.path.join(save_path, 'stacked/denorm/stacked_inputs_i_light_log.npy'))
+    input_data_v = np.load(os.path.join(save_path, 'stacked/denorm/stacked_inputs_v_light_log.npy'))
+    vel_data = np.load(os.path.join(save_path, 'stacked/denorm/stacked_velocities.npy'))
+
+    mean_i = np.mean(input_data_i)
+    std_i = np.std(input_data_i)
+    norm_input_i = (input_data_i - mean_i) / std_i
+    np.save(os.path.join(save_path, 'stacked/norm/stacked_inputs_i_light_log_normalized.npy'), norm_input_i)
+
+    mean_v = np.mean(input_data_v)
+    std_v = np.std(input_data_v)
+    norm_input_v = (input_data_v - mean_v) / std_v
+    np.save(os.path.join(save_path, 'stacked/norm/stacked_inputs_v_light_log_normalized.npy'), norm_input_v)
+
+    mean_vel = np.mean(vel_data)
+    std_vel = np.std(vel_data)
+    norm_vel = (vel_data - mean_vel) / std_vel
+    np.save(os.path.join(save_path, 'stacked/norm/stacked_velocities_normalized.npy'), norm_vel)
+
+    with open('important_stats/normalization_stats.txt', 'w') as f:
+        f.write(f"Input Stokes I mean (log sampled): {mean_i}, std: {std_i}\n")
+        f.write(f"Input Stokes V mean (log sampled): {mean_v}, std: {std_v}\n")
+        f.write(f"Velocities mean: {mean_vel}, std: {std_vel}\n")
+
+def create_downsampled_data(num_samples, cube_path = "/home/xenoss/dat/thesis/dataset/stacked/", save_path = "/home/xenoss/dat/thesis/dataset/dataset_v1/"):
+    # sample random coordinates
+    data_ch = 2
+    data_h_w = 64
+
+    max_ch = 31 - data_ch//2
+    max_h_w = 768 - data_h_w//2
+    min_ch = data_ch//2
+    min_h_w = data_h_w//2
+    center_h = random.sample(range(min_h_w, max_h_w), num_samples)
+    center_w = random.sample(range(min_h_w, max_h_w), num_samples)
+    center_c = random.sample(range(min_ch, max_ch), num_samples)
+
+    #save the rand coordinates for future reference
+    with open('important_stats/random_centers.txt', 'w') as f:
+        f.write("center_c: " + ", ".join(map(str, center_c)) + "\n")
+        f.write("center_h: " + ", ".join(map(str, center_h)) + "\n")
+        f.write("center_w: " + ", ".join(map(str, center_w)) + "\n")
+
+    stokes_I = np.load(cube_path + 'norm/stacked_inputs_i_light_log_normalized.npy')
+    stokes_V = np.load(cube_path + 'norm/stacked_inputs_v_light_log_normalized.npy')
+    velocities = np.load(cube_path + 'norm/stacked_velocities_normalized.npy')
+
+    # center_c = [8, 10, 23, 28, 15, 18, 27, 5, 7, 20, 22, 14, 29, 21, 12, 2, 13, 26, 11, 3, 19, 4]
+    # center_h = [172, 454, 135, 654, 156, 96, 682, 142, 295, 387, 160, 473, 76, 87, 557, 685, 430, 90, 604, 639, 699, 355]
+    # center_w = [525, 681, 687, 519, 698, 408, 228, 261, 655, 223, 468, 220, 680, 92, 669, 538, 134, 601, 204, 635, 474, 152]
+    
+    half_s = data_h_w // 2
+    half_c = data_ch // 2
+
+    for i in range(num_samples):
+        for j in range(num_samples):
+            for k in range(num_samples):
+                ch = center_h[i]
+                cw = center_w[j]
+                cc = center_c[k]
+
+                stokesI = stokes_I[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                stokesV = stokes_V[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                velocity = velocities[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+
+                np.save(save_path + f'inputs/stokes_I/stokes_I_{cc}_{ch}_{cw}.npy', stokesI)
+                np.save(save_path + f'inputs/stokes_V/stokes_V_{cc}_{ch}_{cw}.npy', stokesV)
+                np.save(save_path + f'labels/velocities_{cc}_{ch}_{cw}.npy', velocity)
+
 
 if (__name__ == '__main__'):
     
     main_root = "/dat/xenoss/"
-
-    #create_test_data_5x5_experiments_hybrid()
-    # I = os.listdir(main_root + "datasets_5x5_experiments/normalized/timestep_4/cropped/data_128x128/inputs/")
-    # print("Number of I files: ", len(I))
-    # B = os.listdir(main_root + "datasets_5x5_experiments/normalized/timestep_4/cropped/data_128x128/B/")
-    # print("Number of B files: ", len(B))
-    # vz = os.listdir(main_root + "datasets_5x5_experiments/normalized/timestep_4/cropped/data_128x128/vz/")
-    # print("Number of vz files: ", len(vz))
-    ###### NOTE CREATE B AND VZ, NORMALIZE AND SAVE ###########
-
-    # vz_path_train = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/vz/"
-    # vz_train = os.listdir(vz_path_train)
-    # vz_train.sort()
-    # stacked_vz_train = np.stack([np.load(vz_path_train + v) for v in vz_train], axis = 0)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_vz.npy", stacked_vz_train)
-
-    # vz_path_test = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/vz/"
-    # vz_test = os.listdir(vz_path_test)
-    # vz_test.sort()
-    # stacked_vz_test = np.stack([np.load(vz_path_test + v) for v in vz_test], axis = 0)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_vz.npy", stacked_vz_test)
-
-    # vz_stacked_1 = np.load("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_vz.npy")
-    # vz_stacked_2 = np.load("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_vz.npy")
-    
-    # mean_vz_train = np.mean(vz_stacked_1)
-    # std_vz_train = np.std(vz_stacked_1)
-
-    # mean_vz_test = np.mean(vz_stacked_2)
-    # std_vz_test = np.std(vz_stacked_2)
-
-    # vz_stacked_1 = (vz_stacked_1 - mean_vz_train) / std_vz_train
-    # vz_stacked_2 = (vz_stacked_2 - mean_vz_test) / std_vz_test
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_vz_normalized.npy", vz_stacked_1)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_vz_normalized.npy", vz_stacked_2)
-
-    # print("VZ mean (train): ", mean_vz_train, " VZ std (train): ", std_vz_train)
-    # print("VZ mean (test): ", mean_vz_test, " VZ std (test): ", std_vz_test)
-
-    # Bz_path = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/B/"
-    # create_B(main_path, Bz_path)
-
-    # B_path_train = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/B/"
-    # B_train = os.listdir(B_path_train)
-    # B_train.sort()
-    # stacked_B_train = np.stack([np.load(B_path_train + v) for v in B_train], axis = 0)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_B.npy", stacked_B_train)
-
-    # B_path_test = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/B/"
-    # B_test = os.listdir(B_path_test)
-    # B_test.sort()
-    # stacked_B_test = np.stack([np.load(B_path_test + v) for v in B_test], axis = 0)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_B.npy", stacked_B_test)
-
-    # B_stacked_1 = np.load("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_B.npy")
-    # B_stacked_2 = np.load("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_B.npy")
-    
-    # mean_B_train = np.mean(B_stacked_1)
-    # std_B_train = np.std(B_stacked_1)
-
-    # mean_B_test = np.mean(B_stacked_2)
-    # std_B_test = np.std(B_stacked_2)
-    # print("min b train: ", np.min(B_stacked_1), " max b train: ", np.max(B_stacked_1))
-    # B_stacked_1 = (B_stacked_1 - mean_B_train) / std_B_train
-    # B_stacked_2 = (B_stacked_2 - mean_B_test) / std_B_test
-    # print("min b train: ", np.min(B_stacked_1), " max b train: ", np.max(B_stacked_1))
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_B_normalized.npy", B_stacked_1)
-    # np.save("/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/stacked_B_normalized.npy", B_stacked_2)
-
-    # print("B mean (train): ", mean_B_train, " B std (train): ", std_B_train)
-    # print("B mean (test): ", mean_B_test, " B std (test): ", std_B_test)
-
-    ######################################
-
-    ###### NOTE CREATE B AND VZ, NORMALIZE AND SAVE ###########
-    # generate_data_5x5_experiments_hybrid(None, 
-    #                                     np.load('/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_B_normalized.npy'),
-    #                                     np.load('/home/xenoss/dat/datasets_5x5_experiments/main_dataset_train/stacked_vz_normalized.npy'))
-
-    ######################################
-
-    # intensities = [muram.MuramIntensity(main_dataset + 'inputs/', i) for i in range(12000, 18050, 50)]
-
-    # stacked_intensities = np.stack(intensities, axis = 0)
-    # stacked_velocities_x = np.stack([np.load(main_dataset + 'labels/' + v) for v in vel_x], axis = 0)
-    # stacked_velocities_y = np.stack([np.load(main_dataset + 'labels/' + v) for v in vel_y], axis = 0)
-
-    # print("Shape of stacked intensities: ", stacked_intensities.shape)
-    # print("Shape of stacked velocities x: ", stacked_velocities_x.shape)
-    # print("Shape of stacked velocities y: ", stacked_velocities_y.shape)
-
-    # np.save(main_dataset + '/stacked_intensities_all.npy', stacked_intensities)
-    # np.save(main_dataset + '/stacked_velocities_x_all.npy', stacked_velocities_x)
-    # np.save(main_dataset + '/stacked_velocities_y_all.npy', stacked_velocities_y)
-
-    # generate_data_5x5_experiments(70000, np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_intensities_normalized.npy'),
-    #                                np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_velocities_x_normalized.npy'),
-    #                                np.load('/dat/xenoss/datasets_5x5_experiments/main_dataset_train/stacked_velocities_y_normalized.npy'))
-
-
-    ######## NOTE CREATE TEST DATASET FOR 4X128X128 #############
-    # main_path = "/home/xenoss/dat/datasets_5x5_experiments/main_dataset_test/"
-    # I = np.load(main_path + "stacked_intensities_normalized.npy")
-    # vx = np.load(main_path + "stacked_velocities_x_normalized.npy")
-    # vy = np.load(main_path + "stacked_velocities_y_normalized.npy")
-    # I = I[-61:, :, :]
-    # vx = vx[-61:, :, :]
-    # vy = vy[-61:, :, :]
-
-    # num_samples = I.shape[0] - 3  # 61 - 4 + 1
-    # for idx in range(num_samples):
-    #     I_4 = I[idx:idx+4, :, :]
-    #     vx_4 = vx[idx:idx+4, :, :]
-    #     vy_4 = vy[idx:idx+4, :, :]
-
-    #     vx_middle = vx_4[1:3, :, :]
-    #     vy_middle = vy_4[1:3, :, :]
-    #     velocities = np.stack([
-    #         (vx_middle[0] + vx_middle[1]) / 2,
-    #         (vy_middle[0] + vy_middle[1]) / 2
-    #     ], axis=0)
-    #     np.save(main_path + f"test_4x128x128/inputs/intensities_{idx}.npy", I_4)
-    #     np.save(main_path + f"test_4x128x128/labels/velocities_{idx}.npy", velocities)
+    # create_downsampled_data(num_samples=25)

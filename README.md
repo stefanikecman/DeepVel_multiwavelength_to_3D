@@ -1,8 +1,8 @@
-# Mapping Plasma Flows in Solar Atmosphere using Deep Learning
+# Multi-height Inference of Plasma Flows in the Solar atmosphere using Deep Learning
 
 ## About
 
-DeepVel 3D Velocity is a PyTorch-based framework for prediction and analysis of the horizontal velocity fields from solar data. 
+DeepVel 3D Velocity is a PyTorch-based framework for prediction and analysis of the 3D velocity vector from solar data. 
 It includes data preparation steps, model training, evaluation, and visualization scripts. 
 Also includes physics-informed loss method, that takes into account divergence and vorticity of the inferred data.
 
