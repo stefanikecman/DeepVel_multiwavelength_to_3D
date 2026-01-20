@@ -3,21 +3,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
-import h5py
 import os
-import random
 # from torchsummary import summary
 from torchinfo import summary
 import torch.optim as optim
 import sys
 from collections import OrderedDict
 from datetime import datetime
-import matplotlib.pyplot as plt
 import time
-import matplotlib
-#from prepare_data import normalize_layerwise
-# from metrics_and_plotting import plot_predictions, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map_vertical
-from analysis_fn import div_vor_loss
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -28,12 +21,13 @@ class dataset_deepVel(Dataset):
 
     Custom Dataset based on Dataloaders https://docs.pytorch.org/tutorials/beginner/basics/data_tutorial.html
     """ 
-    def __init__(self, dataset_path, test_idx = None, test = False, stokes_profile = "I"):
+    def __init__(self, dataset_path, tau, test_idx = None, test = False, stokes_profile = "I"):
 
         self.stokes_profile = stokes_profile
         
         self.intensities_dir = os.path.join(dataset_path, f"inputs/stokes_{self.stokes_profile}")
-        self.velocities_dir = os.path.join(dataset_path, "labels")
+        print("Loading velocities from tau: ", tau)
+        self.velocities_dir = os.path.join(dataset_path, "labels/tau_" + tau)
 
         intensities = os.listdir(self.intensities_dir)
         velocities = os.listdir(self.velocities_dir)
@@ -197,7 +191,7 @@ class DeepVel_run(object):
     """
     Class for running the DeepVel model.
     """
-    def __init__(self, batch, dataset_path, network_path, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, stokes_profile="I"):
+    def __init__(self, batch, dataset_path, network_path, tau, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, stokes_profile="I"):
  
         self.root = root
         self.n_filters = 32     
@@ -209,11 +203,16 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.stokes_profile = stokes_profile
 
-        self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
+        self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
+
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            self.model = nn.DataParallel(self.model)
+
+        self.model = self.model.to(device)
 
         if root:
 
-            self.dataset = dataset_deepVel(dataset_path, test_idx = None, test = False, stokes_profile=self.stokes_profile)
+            self.dataset = dataset_deepVel(dataset_path, tau = tau, test_idx = None, test = False, stokes_profile=self.stokes_profile)
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
 
@@ -307,7 +306,10 @@ class DeepVel_run(object):
             if is_best == True:
                 print("Best_model")      
                 min_loss = min(compare_loss, min_loss)
-                torch.save(self.model.state_dict(), self.network_path + '/DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
+                save_path = os.path.join(self.network_path, 'DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
+                model_state = self.model.module.state_dict() if isinstance(self.model, nn.DataParallel) else self.model.state_dict()
+                torch.save(model_state, save_path)
+                #torch.save(self.model.state_dict(), self.network_path + '/DeepVel_torch_epoch_{}_{:.5f}.pt'.format(epoch,np.mean(val_loss_list)))
             
         print('Finished Training')
 
@@ -386,7 +388,12 @@ if (__name__ == '__main__'):
     ###### NOTE best version ######
     input_shape = (2, 43, 64, 64)  # (channels, wavelengths, height, width)
     output_shape = (3, 64, 64)    # (velocity components, height, width)
-    deepvel_net = DeepVel_run(root = main_root, in_shape = input_shape, batch = 8, dataset_path = '/home/xenoss/dat/thesis/dataset/dataset_v1/', network_path = "/home/xenoss/dat/thesis/models/models_v1/stokes_v_model/checkpoints/", stokes_profile="V")
-    deepvel_net.train(120)
+    
+    # taus = ["1e-1", "1e-2", "1e-3", "1e-4"]
+    # stokes_profiles = ["I", "V"]
+    # dataset_path = '/home/xenoss/dat/thesis/data/v1/dataset/train/'
 
-  
+    # for tau in taus:
+    #     for stokes_profile in stokes_profiles:
+    #         deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, batch = 8, dataset_path = dataset_path, network_path = f"/home/xenoss/dat/thesis/models/v1/tau_{tau}/stokes_{stokes_profile.lower()}_model/checkpoints/", stokes_profile=stokes_profile)
+    #         deepvel_net.train(200)  

@@ -1,5 +1,5 @@
+import glob
 import os
-import shutil
 import muram as muram
 import numpy as np
 import torch
@@ -7,11 +7,8 @@ import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import torch.nn as nn
-from scipy import stats
-from prepare_data import file_naming, normalize_layerwise, denormalize_data
-from scipy.stats import linregress
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from analysis_fn import get_divergence, get_vorticity, calculate_correlation, get_all_metrics
+from analysis_fn import get_divergence, get_vorticity, get_all_metrics, denormalize_data
 from enum import Enum
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -24,6 +21,96 @@ class ModelType(Enum):
     STOKES_I = 5
     STOKES_V = 6
     STOKES_IV = 7
+    DEEPVEL_Vz = 8
+    HYBRID_Ivz = 9
+
+def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,save_path, name):
+    """
+    Method for plot_train_val_losses
+    
+    Args:
+        tau_levels: integers corresponding to tau levels, first one should always be intensity
+        ckpts_path: path where the checkpoints are stored
+    """
+    taus = [str(tau) for tau in tau_levels]
+    all_x = []
+    all_train = []
+    all_val = []
+    
+    for i, tau in enumerate(tau_levels):
+        # print(f"tau = {tau}, model type = {model_type[i]}, ckpts_path = {ckpts_path}")
+        if model_type[i] == ModelType.DEEPVEL_I:
+            model_glob = f"{ckpts_path}/DeepVel_I/checkpoints/*.npy"
+        elif model_type[i] == ModelType.DEEPVEL_B:
+            model_glob = f"{ckpts_path}/DeepVel_Bz/tau_{tau}/checkpoints/*.npy"
+        elif model_type[i] == ModelType.DEEPVEL_Vz:
+            model_glob = f"{ckpts_path}/DeepVel_vz/tau_{tau}/checkpoints/*.npy"
+        elif model_type[i] == ModelType.HYBRID_Bvz:
+            model_glob = f"{ckpts_path}/Hybrid_B_vz/tau_{tau}/checkpoints/*.npy"
+        elif model_type[i] == ModelType.HYBRID_IBvz:
+            model_glob = f"{ckpts_path}/Hybrid_I_B_vz/tau_{tau}/checkpoints/*.npy"
+        elif model_type[i] == ModelType.HYBRID_Ivz:
+            model_glob = f"{ckpts_path}/Hybrid_I_vz/tau_{tau}/checkpoints/*.npy"
+
+        elif model_type[i] == ModelType.STOKES_I:
+            model_glob = f"{ckpts_path}/tau_{tau}/stokes_i_model/checkpoints/*.npy"
+        elif model_type[i] == ModelType.STOKES_V:
+            model_glob = f"{ckpts_path}/tau_{tau}/stokes_v_model/checkpoints/*.npy"
+        elif model_type[i] == ModelType.STOKES_IV:
+            model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model/checkpoints/*.npy"
+        
+        path = glob.glob(model_glob)[0]
+        with open(path, "rb") as f:
+            _ = np.load(f, allow_pickle=True).item()
+            save_losses = np.load(f, allow_pickle=True)
+
+        save_losses = np.asarray(save_losses, dtype=float)
+        x = save_losses[:, 0]
+        train_rmse = np.sqrt(save_losses[:, 1])
+        val_rmse = np.sqrt(save_losses[:, 2])
+
+        all_x.append(x)
+        all_train.append(train_rmse)
+        all_val.append(val_rmse)
+
+    plt.figure(figsize=(14, 9))
+    plt.rcParams['font.size'] = 14
+
+    cmap = plt.get_cmap('tab10')
+    n = len(all_train)
+
+    for i in range(n):
+        x = np.asarray(all_x[i])
+        train = np.asarray(all_train[i])
+        val = np.asarray(all_val[i])
+        color = cmap(i % cmap.N)
+        if model_type[i] == ModelType.DEEPVEL_I: 
+            label = "DeepVel I"
+        elif model_type[i] == ModelType.DEEPVEL_B:
+            label = f"DeepVel Bz tau={taus[i]}"
+        elif model_type[i] == ModelType.DEEPVEL_Vz:
+            label = f"DeepVel Vz tau={taus[i]}"
+        elif model_type[i] == ModelType.HYBRID_Bvz:
+            label = f"Hybrid Bz+Vz tau={taus[i]}"
+        elif model_type[i] == ModelType.HYBRID_IBvz:
+            label = f"Hybrid I+Bz+Vz tau={taus[i]}"
+        elif model_type[i] == ModelType.HYBRID_Ivz:
+            label = f"Hybrid I+Vz tau={taus[i]}"
+        elif model_type[i] == ModelType.STOKES_I:
+            label = f"Stokes I tau={taus[i]}"
+        elif model_type[i] == ModelType.STOKES_V:
+            label = f"Stokes V tau={taus[i]}"
+        plt.plot(x, train, color=color, linestyle='-', linewidth=2, label=f"{label} train")
+        plt.plot(x, val,   color=color, linestyle='--', linewidth=1.5, label=f"{label} val")
+
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss (RMSE)')
+    plt.title(title)
+    plt.legend(loc='upper right', fontsize='small', ncol=2)
+    plt.grid(True)
+    out_path = os.path.join(save_path, name + '.png')
+    plt.savefig(out_path, bbox_inches='tight', dpi=200)
+    plt.close()
 
 def load_data_based_on_model_type(dataset_path, n_input_channels, model_type: ModelType, tau = None):
     """
@@ -37,37 +124,32 @@ def load_data_based_on_model_type(dataset_path, n_input_channels, model_type: Mo
         "stokes_I": None,
         "stokes_V": None
     }
-    if model_type == ModelType.HYBRID_IBvz or model_type== ModelType.DEEPVEL_I:
+    if model_type == ModelType.HYBRID_IBvz or model_type== ModelType.DEEPVEL_I or model_type== ModelType.HYBRID_Ivz:
         if tau is not None:
-            inputs["intensity"] = np.load(dataset_path + f"intensities_{tau}.npy")
+            inputs["intensity"] = np.load(os.path.join(dataset_path, f"intensities_tau_{tau}.npy"))
         else:
-            inputs["intensity"] = np.load(dataset_path + f"intensities_tau_{n_input_channels}.npy")
+            inputs["intensity"] = np.load(os.path.join(dataset_path, f"intensities_tau_{n_input_channels}.npy"))
 
 
     if model_type == ModelType.HYBRID_Bvz or model_type== ModelType.DEEPVEL_B or model_type== ModelType.HYBRID_IBvz:
         if tau is not None:
-            inputs["B"] = np.load(dataset_path + f"B_tau_{tau}.npy")
+            inputs["B"] = np.load(os.path.join(dataset_path, f"B_tau_{tau}.npy"))
             
         else:
-            inputs["B"] = np.load(dataset_path + f"B_{n_input_channels}.npy")
+            inputs["B"] = np.load(os.path.join(dataset_path, f"B_{n_input_channels}.npy"))
             
-    if model_type == ModelType.HYBRID_Bvz or model_type== ModelType.HYBRID_IBvz:
+    if model_type == ModelType.HYBRID_Bvz or model_type== ModelType.HYBRID_IBvz  or model_type== ModelType.DEEPVEL_Vz or model_type== ModelType.HYBRID_Ivz:
         if tau is not None:
-            inputs["vz"] = np.load(dataset_path + f"vz_tau_{tau}.npy")
+            inputs["vz"] = np.load(os.path.join(dataset_path, f"vz_tau_{tau}.npy"))
         else:
-            inputs["vz"] = np.load(dataset_path + f"vz_{n_input_channels}.npy")
+            inputs["vz"] = np.load(os.path.join(dataset_path, f"vz_{n_input_channels}.npy"))
 
     if model_type == ModelType.STOKES_I or model_type == ModelType.STOKES_IV:
-        if tau is None:
-            inputs["stokes_I"] = np.load(dataset_path + f"stokes_I_{n_input_channels}.npy")
-        else:
-            pass
+        inputs["stokes_I"] = np.load(os.path.join(dataset_path, f"inputs/stokes_I/stokes_I_{n_input_channels}.npy"))
+
 
     if model_type == ModelType.STOKES_V or model_type == ModelType.STOKES_IV:
-        if tau is None:
-            inputs["stokes_V"] = np.load(dataset_path + f"stokes_V_{n_input_channels}.npy")
-        else:
-            inputs["stokes_V"] = np.load(dataset_path + f"stokes_V_{tau}.npy")
+        inputs["stokes_V"] = np.load(os.path.join(dataset_path, f"inputs/stokes_V/stokes_V_{n_input_channels}.npy"))
 
     return inputs
 
@@ -99,12 +181,14 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
     inputs = load_data_based_on_model_type(dataset_path, n_input_channels, model_type, tau)
 
     intensity, B, vz, stokes_I, stokes_V = inputs["intensity"], inputs["B"], inputs["vz"], inputs["stokes_I"], inputs["stokes_V"]
-    print("Loaded data shapes:", stokes_V.shape)
-    print("Loaded data shapes:", stokes_I.shape)
+
     if tau is not None:
-        velocity_full_map = np.load(dataset_path + f"velocities_tau_{tau}.npy")
+        velocity_full_map = np.load(os.path.join(dataset_path, f"labels/tau_{tau}/velocities_tau_{tau}.npy"))
     else:
-        velocity_full_map = np.load(dataset_path + f"velocities_{n_input_channels}.npy")
+        velocity_full_map = np.load(os.path.join(dataset_path, f"labels/velocities_{n_input_channels}.npy"))
+
+    if velocity_full_map.ndim == 4:
+        velocity_full_map = velocity_full_map[0]
 
     if zoomed_in_size != None:
         #plot the central part zoomed in to that size
@@ -148,6 +232,9 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
     if model_type == ModelType.HYBRID_IBvz:
         velocity_pred = deepvel_object.predict(intensity_to_plot, B_to_plot, vz_to_plot, params_model)
 
+    elif model_type == ModelType.HYBRID_Ivz:
+        velocity_pred = deepvel_object.predict(intensity_to_plot, vz_to_plot, params_model)
+
     elif model_type == ModelType.HYBRID_Bvz:
         velocity_pred = deepvel_object.predict(B_to_plot, vz_to_plot, params_model)
 
@@ -156,6 +243,10 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
 
     elif model_type == ModelType.DEEPVEL_I:
         velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
+    
+    elif model_type == ModelType.DEEPVEL_Vz:
+        print("Predicting Vz only")
+        velocity_pred = deepvel_object.predict(vz_to_plot, params_model)
 
     elif model_type == ModelType.STOKES_I:
         velocity_pred = deepvel_object.predict(stokes_I_to_plot, params_model)
@@ -312,9 +403,9 @@ def plot_predictions(input_gt, vel_gt, vel_pred, path_save, filename, plot_inten
 
     plt.tight_layout()
     if arrows:
-        plt.savefig(path_save + filename + '_arrows.png', bbox_inches='tight')
+        plt.savefig(os.path.join(path_save, filename + '_arrows.png'), bbox_inches='tight')
     else:
-        plt.savefig(path_save + filename + '.png', bbox_inches='tight')
+        plt.savefig(os.path.join(path_save, filename + '.png'), bbox_inches='tight')
     plt.close()
 
 def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filename, plotting_dim = None, zoom_out = 0):
@@ -382,7 +473,7 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
         ax[2].set_xlabel('Original data')
         ax[2].set_ylabel('Predicted data')
 
-    plt.savefig(path_save+filename + '.png')
+    plt.savefig(os.path.join(path_save, filename + '.png'))
     plt.close()
 
 # def plot_test_full_map (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, 
@@ -442,7 +533,7 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
 
 
 def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = False, n_input_channels = 2, 
-                                                   scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, return_metrics = False, model_type = ModelType.DEEPVEL_I, title = None, tau = None):
+                                                   scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, mean_vel = None, std_vel = None, return_metrics = False, model_type = ModelType.DEEPVEL_I, title = None, tau = None):
     """
     Plot predictions and scatter plots for a full map in a vertical layout.
     Args:
@@ -463,7 +554,7 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         title: Optional title for the plot
         tau: Optional optical depth parameter
     """
-
+    #TODO refactor to work with different shapes of velocities! 
     plt.rcParams['font.size'] = 40
 
     inputs, velocity_to_plot, velocity_pred = load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type, tau, zoomed_in_size)
@@ -471,8 +562,8 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     extent = [0, velocity_to_plot.shape[2]*0.016, 0, velocity_to_plot.shape[1]*0.016]
         
-    print("velocity_to_plot shape:", velocity_to_plot.shape)
-    print("velocity_pred shape:", velocity_pred.shape)
+    # print("velocity_to_plot shape:", velocity_to_plot.shape)
+    # print("velocity_pred shape:", velocity_pred.shape)
     mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_to_plot.to(device))
     rmse_l = torch.sqrt(mse_l)
 
@@ -482,11 +573,8 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     nrows = 4 if plot_intensity else 3
     ncols = 2 if velocity_to_plot.shape[0]==2 else 3
 
-    if velocity_to_plot.shape[0]==3:
-        nrows +=1
-
-    if denormalized or velocity_to_plot.shape[0]==3: figsize = (35, 40)
-    else: figsize=(25, 35)
+    if velocity_to_plot.shape[0]==3: figsize = (42, 47)
+    else: figsize=(37, 45)
 
     fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize)
     plt.subplots_adjust(hspace=0.4)
@@ -497,13 +585,10 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         intensity_1 = intensity_to_plot[n_input_channels/2, :, :].cpu().numpy()
 
     vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
-    vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
+    vel_1 = velocity_to_plot[1, :, :].cpu().numpy() 
 
     vel_0_pred = velocity_pred[0, :, :].cpu().numpy()
     vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
-
-    vel_2 = None
-    vel_2_pred = None
 
     if velocity_to_plot.shape[0]==3:
         vel_2 = velocity_to_plot[2, :, :].cpu().numpy()
@@ -529,18 +614,53 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
         idx += 1
 
-    mean_vel = 1360.96728515625
-    std_vel = 230181.609375
-    vmin = -3 * std_vel/1e5
-    vmax = -1 * vmin
+    if denormalized:
+        if std_vel is None:
+            std_vel_x = np.std(vel_0)
+            std_vel_y = np.std(vel_1)
+            if velocity_to_plot.shape[0]==3:
+                std_vel_z = np.std(vel_2)
+        else:
+            if len(std_vel) > 1:
+                std_vel_x = std_vel[0]
+                std_vel_y = std_vel[1]
+                vmin = -3*max(std_vel_x, std_vel_y)/1e5
+                vmax = -1*vmin
+                if velocity_to_plot.shape[0]==3:
+                    std_vel_z = std_vel[2]
+                    vmin = -3*max(std_vel_x, std_vel_y, std_vel_z)/1e5
+                    vmax = -1*vmin
+            else:
+                vmin = -3*std_vel[0]/1e5
+                vmax = -1*vmin
 
-    # if denormalized:
-    #     vel_0 = denormalize_data(vel_0, mean_vel, std_vel)/1e5
-    #     vel_1 = denormalize_data(vel_1, mean_vel, std_vel)/1e5
-    #     vel_0_pred = denormalize_data(vel_0_pred, mean_vel, std_vel)/1e5
-    #     vel_1_pred = denormalize_data(vel_1_pred, mean_vel, std_vel)/1e5
-    #     vmin = -3 * std_vel/1e5
-    #     vmax = -1 * vmin
+    else:
+        vmin = -3*torch.std(velocity_to_plot)
+        vmax = -1*vmin
+
+    if denormalized:
+        if len(mean_vel) > 1:
+            mean_vel_x = mean_vel[0]
+            mean_vel_y = mean_vel[1]
+            
+            vel_0 = denormalize_data(vel_0, mean_vel_x, std_vel_x)/1e5
+            vel_1 = denormalize_data(vel_1, mean_vel_y, std_vel_y)/1e5
+            vel_0_pred = denormalize_data(vel_0_pred, mean_vel_x, std_vel_x)/1e5
+            vel_1_pred = denormalize_data(vel_1_pred, mean_vel_y, std_vel_y)/1e5
+
+            if velocity_to_plot.shape[0]==3:
+                mean_vel_z = mean_vel[2]
+                vel_2 = denormalize_data(vel_2, mean_vel_z, std_vel_z)/1e5
+                vel_2_pred = denormalize_data(vel_2_pred, mean_vel_z, std_vel_z)/1e5
+        else:
+            vel_0 = denormalize_data(vel_0, mean_vel[0], std_vel[0])/1e5
+            vel_1 = denormalize_data(vel_1, mean_vel[0], std_vel[0])/1e5
+            vel_0_pred = denormalize_data(vel_0_pred, mean_vel[0], std_vel[0])/1e5
+            vel_1_pred = denormalize_data(vel_1_pred, mean_vel[0], std_vel[0])/1e5
+
+            if velocity_to_plot.shape[0]==3:
+                vel_2 = denormalize_data(vel_2, mean_vel[0], std_vel[0])/1e5
+                vel_2_pred = denormalize_data(vel_2_pred, mean_vel[0], std_vel[0])/1e5
 
     im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
     ax[idx][0].set_title('vx - ground truth', pad = 20)
@@ -555,6 +675,7 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     cbar = add_colorbar(im, ax[idx][1])
 
     if velocity_to_plot.shape[0]==3:
+
         ax[idx][2].imshow(vel_2.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
         ax[idx][2].set_title('vz - ground truth', pad = 20)
         ax[idx][2].set_xlabel('x [Mm]')
@@ -584,9 +705,6 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     idx +=1
 
-    vmin2 = -3 * np.std(vel_0)/1e5
-    vmax2 = -1 * vmin2
-
     im = ax[idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
     min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
     max0 = max(vel_0.max(), vel_0_pred.max()) + zoom_out
@@ -613,10 +731,10 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         ax[idx][2].set_ylabel('Predicted data')
         
     
-    divergence_orig = get_divergence(vel_0, vel_1, vel_2)
-    divergence_pred = get_divergence(vel_0_pred, vel_1_pred, vel_2_pred)
-    vorticity_orig = get_vorticity(vel_0, vel_1, vel_2)
-    vorticity_pred = get_vorticity(vel_0_pred, vel_1_pred, vel_2_pred)
+    divergence_orig = get_divergence(vel_0, vel_1)
+    divergence_pred = get_divergence(vel_0_pred, vel_1_pred)
+    vorticity_orig = get_vorticity(vel_0, vel_1)
+    vorticity_pred = get_vorticity(vel_0_pred, vel_1_pred)
 
     if velocity_to_plot.shape[0]==3:
         mse_l, rmse_l, pearson0, pearson1, pearson2, slope_x, slope_y, slope_z = get_all_metrics(velocity_to_plot, velocity_pred).values()
@@ -643,11 +761,14 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         print(f'Vorticity - MSE Loss: {mse_v:.4f}, Root MSE Loss: {rmse_v:.4f}, Pearson: {pearson_v:.3f}, Slope: {slope_v:.3f}')
     
     if title is not None:
+        if denormalized: title = title + ' (denormalized)'
         plt.suptitle(title, fontsize=70, y=0.98)
 
     if test_save_path is not None:
-        # plt.savefig(test_save_path + 'full_analysis_' + name + '.png')
-        fig.savefig(test_save_path + 'full_analysis_' + name + '.png')
+        if denormalized:
+            fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_' + name + '.png'))
+        else:
+            fig.savefig(os.path.join(test_save_path, 'full_analysis_' + name + '.png'))
     plt.close(fig)
 
     if return_metrics:

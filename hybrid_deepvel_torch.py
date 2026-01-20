@@ -1,35 +1,25 @@
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-from torchvision import transforms
 from torch.utils.data import Dataset, DataLoader, random_split
-import h5py
 import os
-import random
 #from torchsummary import summary
 import torch.optim as optim
 import sys
 from collections import OrderedDict
 from datetime import datetime
-import matplotlib.pyplot as plt
-from torcheval.metrics.functional import binary_accuracy
 import time
 from torchinfo import summary
-import matplotlib
-#from prepare_data import normalize_layerwise
-# from metrics_and_plotting import plot_predictions, plot_test_full_map, plot_scatter_plot, calculate_correlation, plot_prediction_and_scatter_full_map_vertical
-from analysis_fn import div_vor_loss
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class dataset_deepVel(Dataset): 
     """
     Dataset class for DeepVel, modified to take two inputs: Stokes I and Stokes V.
     """ 
     def __init__(self, dataset_path, test_idx = None, test = False, tau = None):
-        self.stokes_I_dir = os.path.join(dataset_path, "inputs/stokes_I") if tau is None else os.path.join(dataset_path, f"inputs/stokes_I/tau_{tau}")
-        self.stokes_V_dir = os.path.join(dataset_path, "inputs/stokes_V") if tau is None else os.path.join(dataset_path, f"inputs/stokes_V/tau_{tau}")
+        self.stokes_I_dir = os.path.join(dataset_path, "inputs/stokes_I") 
+        self.stokes_V_dir = os.path.join(dataset_path, "inputs/stokes_V")
         self.velocities_dir = os.path.join(dataset_path, "labels") if tau is None else os.path.join(dataset_path, f"labels/tau_{tau}")
 
         velocities = os.listdir(self.velocities_dir)
@@ -220,7 +210,6 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.lr = 1e-4
         self.network_path = network_path
-        self.dataset = dataset_deepVel(dataset_path, test_idx=None, test=False, tau= self.tau)
         self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
@@ -397,13 +386,13 @@ class DeepVel_run(object):
        
 if (__name__ == '__main__'):
 
-    #main_root = "/dat/xenoss/"
+    main_root = "/dat/xenoss/"
 
     ######### NOTE training multiheight models ########
-    main_root = "/home/xenoss/dat/"
-    # in_shape = (2, 43, 64, 64)
-    # out_shape = (3, 64, 64)
-    # network_path = "/home/xenoss/dat/thesis/models/models_v1/hybrid_model/checkpoints/"
-    # data_path = '/home/xenoss/dat/thesis/dataset/dataset_v1/'
-    # deepvel_net = DeepVel_run(root = main_root, in_shape=in_shape, out_shape=out_shape, batch = 8, dataset_path = data_path, network_path = network_path)
-    # deepvel_net.train(120)
+    taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
+    dataset_path = '/home/xenoss/dat/thesis/data/v1/dataset/train/'
+    input_shape = (2, 43, 64, 64)  # (channels, wavelengths, height, width)
+    output_shape = (3, 64, 64)    # (velocity components, height, width)
+    for tau in taus:
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, batch = 8, dataset_path = dataset_path, network_path = f"/home/xenoss/dat/thesis/models/v1/tau_{tau}/hybrid_model/checkpoints/")
+        deepvel_net.train(200)  
