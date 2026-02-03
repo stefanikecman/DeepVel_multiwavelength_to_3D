@@ -58,7 +58,7 @@ def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,s
             model_glob = f"{ckpts_path}/tau_{tau}/stokes_v_model/checkpoints/*.npy"
         elif model_type[i] == ModelType.STOKES_IV:
             model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model/checkpoints/*.npy"
-        
+
         path = glob.glob(model_glob)[0]
         with open(path, "rb") as f:
             _ = np.load(f, allow_pickle=True).item()
@@ -100,6 +100,9 @@ def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,s
             label = f"Stokes I tau={taus[i]}"
         elif model_type[i] == ModelType.STOKES_V:
             label = f"Stokes V tau={taus[i]}"
+
+        elif model_type[i] == ModelType.STOKES_IV:
+            label = f"Hybrid Stokes IV tau={taus[i]}"
         plt.plot(x, train, color=color, linestyle='-', linewidth=2, label=f"{label} train")
         plt.plot(x, val,   color=color, linestyle='--', linewidth=1.5, label=f"{label} val")
 
