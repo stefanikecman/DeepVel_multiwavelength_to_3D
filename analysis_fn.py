@@ -113,29 +113,45 @@ def get_all_metrics(original, predicted, is_divergence=False):
             "slope": slope_x
         }
     else:
-        orig_0 = original[0, :, :].cpu().numpy()
-        orig_1 = original[1, :, :].cpu().numpy()
-        orig_2 = original[2, :, :].cpu().numpy()
-        pred_0 = predicted[0, :, :].cpu().numpy()
-        pred_1 = predicted[1, :, :].cpu().numpy()
-        pred_2 = predicted[2, :, :].cpu().numpy()
+        if original.shape[0] < 3 or predicted.shape[0] < 3:
+            #this is the case for vz only model where we only have 1 channel in gt and pred
+            orig_2 = original[0, :, :].cpu().numpy()
+            pred_2 = predicted[0, :, :].cpu().numpy()
+            slope_z, intercept_z, r_value_z, p_value_z, std_err_z = linregress(orig_2.flatten(), pred_2.flatten())
+            pearsons = calculate_correlation(original, predicted)
 
-        slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(orig_0.flatten(), pred_0.flatten())
-        slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(orig_1.flatten(), pred_1.flatten())
-        slope_z, intercept_z, r_value_z, p_value_z, std_err_z = linregress(orig_2.flatten(), pred_2.flatten())
+            return {
+                "mse": mse_l.item(), 
+                "rmse": rmse_l.item(),
+                "pearson_vz": pearsons[0].statistic,
+                "slope_vz": slope_z
+            }
+        
 
-        pearsons = calculate_correlation(original, predicted)
-        pearson0 = pearsons[0].statistic
-        pearson1 = pearsons[1].statistic
-        pearson2 = pearsons[2].statistic if len(pearsons) > 2 else None
+        else:
+            orig_0 = original[0, :, :].cpu().numpy()
+            orig_1 = original[1, :, :].cpu().numpy()
+            orig_2 = original[2, :, :].cpu().numpy()
+            pred_0 = predicted[0, :, :].cpu().numpy()
+            pred_1 = predicted[1, :, :].cpu().numpy()
+            pred_2 = predicted[2, :, :].cpu().numpy()
 
-        return {
-            "mse": mse_l.item(), 
-            "rmse": rmse_l.item(),
-            "pearson_vx": pearson0.item(),
-            "pearson_vy": pearson1.item(),
-            "pearson_vz": pearson2.item(),
-            "slope_vx": slope_x,
-            "slope_vy": slope_y,
-            "slope_vz": slope_z
-        }
+            slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(orig_0.flatten(), pred_0.flatten())
+            slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(orig_1.flatten(), pred_1.flatten())
+            slope_z, intercept_z, r_value_z, p_value_z, std_err_z = linregress(orig_2.flatten(), pred_2.flatten())
+
+            pearsons = calculate_correlation(original, predicted)
+            pearson0 = pearsons[0].statistic
+            pearson1 = pearsons[1].statistic
+            pearson2 = pearsons[2].statistic if len(pearsons) > 2 else None
+
+            return {
+                "mse": mse_l.item(), 
+                "rmse": rmse_l.item(),
+                "pearson_vx": pearson0.item(),
+                "pearson_vy": pearson1.item(),
+                "pearson_vz": pearson2.item(),
+                "slope_vx": slope_x,
+                "slope_vy": slope_y,
+                "slope_vz": slope_z
+            }

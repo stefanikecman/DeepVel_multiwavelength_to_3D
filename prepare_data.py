@@ -151,17 +151,26 @@ def crop_image_center (original_dir, input_data_name, new_dim, save_dir):
         save_dir: Directory where the cropped image will be saved
     """
 
-    input_data = np.load(original_dir + input_data_name)
+    input_data = np.load(os.path.join(original_dir, input_data_name))
 
-    _, h, w = input_data.shape
+    if input_data.ndim == 3:
+        _, h, w = input_data.shape
+
+    elif input_data.ndim == 4:
+        _,_,h,w = input_data.shape
     cropped_img = []
 
     y_im_center = int(h/2)
     x_im_center = int(w/2)
 
-    cropped_img = input_data[:, (y_im_center - int(new_dim/2)): (y_im_center + int(new_dim/2)), (x_im_center - int(new_dim/2)): (x_im_center + int(new_dim/2))]
+    if input_data.ndim == 3:
+        cropped_img = input_data[:, (y_im_center - int(new_dim/2)): (y_im_center + int(new_dim/2)), (x_im_center - int(new_dim/2)): (x_im_center + int(new_dim/2))]
 
-    np.save(save_dir + input_data_name.replace(".npy", "_cropped.npy"), cropped_img)
+    elif input_data.ndim == 4:
+        cropped_img = input_data[:, :, (y_im_center - int(new_dim/2)): (y_im_center + int(new_dim/2)), (x_im_center - int(new_dim/2)): (x_im_center + int(new_dim/2))]
+
+    #np.save(save_dir + input_data_name.replace(".npy", "_cropped.npy"), cropped_img)
+    np.save(os.path.join(save_dir, input_data_name), cropped_img)
 
 def crop_image_every_nth (n, original_dir, data_idx, new_dim, save_dir, sample_random = False):
     """
@@ -325,79 +334,81 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
 
     #LOG SAMPLING IN INDICES
 
-    # h, w, c, l = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_0.fits'))[0].data.shape
-    # n_samples = [21,11,11]
-    # line_centers = [269, 542, 586]
-    # line_widths = [250, 50, 50]
-    # indices = [np.logspace(np.log10(1), np.log10(line_widths[i]//2), n_samples[i]//2) for i in range(len(n_samples))]
-    # indices = [np.round(ind).astype(int) for ind in indices]
-    # offsets = [np.concatenate((-ind[::-1], [0], ind)) for ind in indices]
-    # individual_grids = [offsets[i] + line_centers[i] for i in range(len(line_centers))] 
-    # new_index_grid = [np.clip(ig, 0, l-1) for ig in individual_grids]
-    # #np.save(os.path.join(save_path, dataset_version, 'downsampled_grids', 'indices_downsampled.npy'), np.concatenate(new_index_grid))
+    h, w, c, l = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_0.fits'))[0].data.shape
+    # n_samples = [21,11,11] #for v1 and v2
+    # n_samples = [42, 22, 22] #for v3
+    n_samples = [84, 44, 44] # for v4
+    line_centers = [269, 542, 586]
+    line_widths = [250, 50, 50]
+    indices = [np.logspace(np.log10(1), np.log10(line_widths[i]//2), n_samples[i]//2) for i in range(len(n_samples))]
+    indices = [np.round(ind).astype(int) for ind in indices]
+    offsets = [np.concatenate((-ind[::-1], [0], ind)) for ind in indices]
+    individual_grids = [offsets[i] + line_centers[i] for i in range(len(line_centers))] 
+    new_index_grid = [np.clip(ig, 0, l-1) for ig in individual_grids]
+    np.save(os.path.join(save_path, dataset_version, 'downsampled_grids', 'indices_downsampled.npy'), np.concatenate(new_index_grid))
     
-    # input_data_i, input_data_v = [], []
-    # for i in range(0, 4650, 150):
-    #     input_data = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{i}.fits'))[0].data
+    input_data_i, input_data_v = [], []
+    for i in range(0, 4650, 150):
+        input_data = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{i}.fits'))[0].data
 
-    #     #sample logarithmically around the centers of the spectral lines
-    #     stokes_I = input_data[:, :, 0, :]
-    #     stokes_V = input_data[:, :, 1, :]
-    #     stokes_I_g, stokes_V_g = [], []
+        #sample logarithmically around the centers of the spectral lines
+        stokes_I = input_data[:, :, 0, :]
+        stokes_V = input_data[:, :, 1, :]
+        stokes_I_g, stokes_V_g = [], []
 
-    #     for g in new_index_grid:
-    #         stokes_I_g.append(stokes_I[:, :, g])
-    #         stokes_V_g.append(stokes_V[:, :, g])
+        for g in new_index_grid:
+            stokes_I_g.append(stokes_I[:, :, g])
+            stokes_V_g.append(stokes_V[:, :, g])
        
-    #     stokes_I_d = np.concatenate(stokes_I_g, axis=2)
-    #     stokes_V_d = np.concatenate(stokes_V_g, axis=2)
+        stokes_I_d = np.concatenate(stokes_I_g, axis=2)
+        stokes_V_d = np.concatenate(stokes_V_g, axis=2)
 
-    #     I_t = np.transpose(stokes_I_d, (2, 0, 1))  
-    #     V_t = np.transpose(stokes_V_d, (2, 0, 1)) 
-    #     # np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_I', f'stokesI_{i}_downsampled'), I_t)
-    #     # np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_V', f'stokesV_{i}_downsampled'), V_t)
+        I_t = np.transpose(stokes_I_d, (2, 0, 1))  
+        V_t = np.transpose(stokes_V_d, (2, 0, 1)) 
+        # np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_I', f'stokesI_{i}_downsampled'), I_t)
+        # np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_V', f'stokesV_{i}_downsampled'), V_t)
         
-    #     input_data_i.append(I_t)
-    #     input_data_v.append(V_t)
+        input_data_i.append(I_t)
+        input_data_v.append(V_t)
 
-    # I_save = np.stack(input_data_i, axis=0)
-    # V_save = np.stack(input_data_v, axis=0)
-    # print(f"Input I shape after downsampling: {I_save.shape}")
-    # print(f"Input V shape after downsampling: {V_save.shape}")
-    # np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'), I_save)
-    # np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'), V_save)
+    I_save = np.stack(input_data_i, axis=0)
+    V_save = np.stack(input_data_v, axis=0)
+    print(f"Input I shape after downsampling: {I_save.shape}")
+    print(f"Input V shape after downsampling: {V_save.shape}")
+    np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'), I_save)
+    np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'), V_save)
 
     # OUTPUTS
-    print("Generating labels...")
-    v1_iters = np.arange(50, 4550, 150)
-    v2_iters = np.arange(100, 4600, 150)
+    # print("Generating labels...")
+    # v1_iters = np.arange(50, 4550, 150)
+    # v2_iters = np.arange(100, 4600, 150)
 
-    vel_data = []
-    for i in range(len(v1_iters)):
-        v1_idx = v1_iters[i]
-        v2_idx = v2_iters[i]
+    # vel_data = []
+    # for i in range(len(v1_iters)):
+    #     v1_idx = v1_iters[i]
+    #     v2_idx = v2_iters[i]
 
-        muram_v1 = mio.MuramTauSlice(murampath, v1_idx, tau)
-        muram_v2 = mio.MuramTauSlice(murampath, v2_idx, tau)
+    #     muram_v1 = mio.MuramTauSlice(murampath, v1_idx, tau)
+    #     muram_v2 = mio.MuramTauSlice(murampath, v2_idx, tau)
 
-        vx1 = muram_v1.vy[::2,::2]
-        vy1 = muram_v1.vz[::2,::2]
-        vz1 = muram_v1.vx[::2,::2]
+    #     vx1 = muram_v1.vy[::2,::2]
+    #     vy1 = muram_v1.vz[::2,::2]
+    #     vz1 = muram_v1.vx[::2,::2]
 
-        vx2 = muram_v2.vy[::2,::2]
-        vy2 = muram_v2.vz[::2,::2]
-        vz2 = muram_v2.vx[::2,::2]
+    #     vx2 = muram_v2.vy[::2,::2]
+    #     vy2 = muram_v2.vz[::2,::2]
+    #     vz2 = muram_v2.vx[::2,::2]
 
-        vx = (vx1 + vx2) / 2.
-        vy = (vy1 + vy2) / 2.
-        vz = (vz1 + vz2) / 2.
+    #     vx = (vx1 + vx2) / 2.
+    #     vy = (vy1 + vy2) / 2.
+    #     vz = (vz1 + vz2) / 2.
 
-        v_out = np.stack([vx, vy, vz], axis=0)
-        #np.save(os.path.join(save_path, 'labels', f'vel_{v1_idx}_{v2_idx}.npy'), v_out)
-        vel_data.append(v_out)
-    vel_data = np.stack(vel_data, axis=0)
-    print(f"Velocity data shape: {vel_data.shape}")
-    np.save(os.path.join(save_path, dataset_version, f'stacked/denorm/stacked_velocities_{tau}.npy'), vel_data)
+    #     v_out = np.stack([vx, vy, vz], axis=0)
+    #     #np.save(os.path.join(save_path, 'labels', f'vel_{v1_idx}_{v2_idx}.npy'), v_out)
+    #     vel_data.append(v_out)
+    # vel_data = np.stack(vel_data, axis=0)
+    # print(f"Velocity data shape: {vel_data.shape}")
+    # np.save(os.path.join(save_path, dataset_version, f'stacked/denorm/stacked_velocities_{tau}.npy'), vel_data)
 
     #NORMALIZE DATA AND SAVE STATS
     print("Normalizing data...")
@@ -415,30 +426,32 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
     norm_input_v = (input_data_v - mean_v) / std_v
     np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_inputs_v_light_log_normalized.npy'), norm_input_v)
 
-    mean_vel = np.mean(vel_data)
-    std_vel = np.std(vel_data)
-    norm_vel = (vel_data - mean_vel) / std_vel
-    np.save(os.path.join(save_path, dataset_version, f'stacked/norm/stacked_velocities_{tau}_normalized.npy'), norm_vel)
+    # mean_vel = np.mean(vel_data)
+    # std_vel = np.std(vel_data)
+    # norm_vel = (vel_data - mean_vel) / std_vel
+    # np.save(os.path.join(save_path, dataset_version, f'stacked/norm/stacked_velocities_{tau}_normalized.npy'), norm_vel)
 
     with open(f'important_stats/normalization_stats_{dataset_version}.txt', 'a') as f:
-        # f.write(f"Input Stokes I mean (log sampled): {mean_i}, std: {std_i}\n")
-        # f.write(f"Input Stokes V mean (log sampled): {mean_v}, std: {std_v}\n")
-        f.write(f"Velocities mean tau = {tau}: {mean_vel}, std: {std_vel}\n")
+        f.write(f"Input Stokes I mean (log sampled): {mean_i}, std: {std_i}\n")
+        f.write(f"Input Stokes V mean (log sampled): {mean_v}, std: {std_v}\n")
+        # f.write(f"Velocities mean tau = {tau}: {mean_vel}, std: {std_vel}\n")
 
-def create_downsampled_data(num_samples, dataset_version, main_path = "/home/xenoss/dat/thesis/data/"):
+def create_downsampled_data(num_samples_per_channel, num_spatial_samples, dataset_version, main_path = "/home/xenoss/dat/thesis/data/"):
     cube_path = os.path.join(main_path, dataset_version, "stacked/norm/")
     save_path = os.path.join(main_path, dataset_version, "dataset/train/")
     # sample random coordinates
     data_ch = 2
-    data_h_w = 64
+    #data_h_w = 64
+    data_h_w = 16
 
     max_ch = 31 - data_ch//2
     max_h_w = 768 - data_h_w//2
     min_ch = data_ch//2
     min_h_w = data_h_w//2
-    center_h = random.sample(range(min_h_w, max_h_w), num_samples)
-    center_w = random.sample(range(min_h_w, max_h_w), num_samples)
-    center_c = random.sample(range(min_ch, max_ch), num_samples)
+
+    center_h = random.sample(range(min_h_w, max_h_w), num_spatial_samples)
+    center_w = random.sample(range(min_h_w, max_h_w), num_spatial_samples)
+    center_c = random.sample(range(min_ch, max_ch), num_samples_per_channel)
 
     #save the rand coordinates for future reference
     with open(f'important_stats/random_centers_{dataset_version}.txt', 'w') as f:
@@ -462,10 +475,10 @@ def create_downsampled_data(num_samples, dataset_version, main_path = "/home/xen
     half_s = data_h_w // 2
     half_c = data_ch // 2
 
-    for i in range(num_samples):
+    for i in range(num_spatial_samples):
         print("Processing center: ", i)
-        for j in range(num_samples):
-            for k in range(num_samples):
+        for j in range(num_spatial_samples):
+            for k in range(num_samples_per_channel):
                 ch = center_h[i]
                 cw = center_w[j]
                 cc = center_c[k]
@@ -509,13 +522,79 @@ def create_last_2_layers_test_data (dataset_version, main_path = "/home/xenoss/d
     vel_1e_3_last2 = vel_1e_3[-1:, :, :, :]
     vel_1e_4_last2 = vel_1e_4[-1:, :, :, :]
 
-    np.save(os.path.join(save_path, 'inputs/stokes_I_last2_layers.npy'), stokes_I_last2)
-    np.save(os.path.join(save_path, 'inputs/stokes_V_last2_layers.npy'), stokes_V_last2)
+    np.save(os.path.join(save_path, 'inputs/stokes_I/stokes_I_last2_layers.npy'), stokes_I_last2)
+    np.save(os.path.join(save_path, 'inputs/stokes_V/stokes_V_last2_layers.npy'), stokes_V_last2)
     np.save(os.path.join(save_path, 'labels/tau_1.0/velocities_last2_layers.npy'), vel_1_last2)
     np.save(os.path.join(save_path, 'labels/tau_1e-1/velocities_last2_layers.npy'), vel_1e_1_last2)
     np.save(os.path.join(save_path, 'labels/tau_1e-2/velocities_last2_layers.npy'), vel_1e_2_last2)
     np.save(os.path.join(save_path, 'labels/tau_1e-3/velocities_last2_layers.npy'), vel_1e_3_last2)
     np.save(os.path.join(save_path, 'labels/tau_1e-4/velocities_last2_layers.npy'), vel_1e_4_last2)
+
+def crop_center_4_patches(original_dir, input_data_name, new_dim, save_dir):
+    '''
+    Crop the center of the image into 4 patches of size new_dim x new_dim.
+    Args:
+        original_dir: Directory where the original image is located
+        input_data_name: Name of the input data file
+        new_dim: Dimension for the cropped patches (assumed to be square)
+        save_dir: Directory where the cropped patches will be saved
+    '''
+
+    input_data = np.load(os.path.join(original_dir, input_data_name))
+
+    if input_data.ndim == 3:
+        _, h, w = input_data.shape
+
+    elif input_data.ndim == 4:
+        _,_,h,w = input_data.shape
+
+    y_im_center = int(h/2)
+    x_im_center = int(w/2)
+
+    if input_data.ndim == 3:
+        cropped_img1 = input_data[:, (y_im_center - new_dim): y_im_center, (x_im_center - new_dim): x_im_center]
+        cropped_img2 = input_data[:, (y_im_center - new_dim): y_im_center, x_im_center: (x_im_center + new_dim)]
+        cropped_img3 = input_data[:, y_im_center: (y_im_center + new_dim), (x_im_center - new_dim): x_im_center]
+        cropped_img4 = input_data[:, y_im_center: (y_im_center + new_dim), x_im_center: (x_im_center + new_dim)]
+
+    elif input_data.ndim == 4:
+        cropped_img1 = input_data[:, :, (y_im_center - new_dim): y_im_center, (x_im_center - new_dim): x_im_center]
+        cropped_img2 = input_data[:, :, (y_im_center - new_dim): y_im_center, x_im_center: (x_im_center + new_dim)]
+        cropped_img3 = input_data[:, :, y_im_center: (y_im_center + new_dim), (x_im_center - new_dim): x_im_center]
+        cropped_img4 = input_data[:, :, y_im_center: (y_im_center + new_dim), x_im_center: (x_im_center + new_dim)]
+
+    np.save(os.path.join(save_dir, input_data_name.replace(".npy", "_1.npy")), cropped_img1)
+    np.save(os.path.join(save_dir, input_data_name.replace(".npy", "_2.npy")), cropped_img2)
+    np.save(os.path.join(save_dir, input_data_name.replace(".npy", "_3.npy")), cropped_img3)
+    np.save(os.path.join(save_dir, input_data_name.replace(".npy", "_4.npy")), cropped_img4)
+
+def create_dataset_v2(v1_path = "/dat/xenoss/thesis/data/v1/dataset/train", save_path = "/dat/xenoss/thesis/data/v2/dataset/train/"):
+    '''
+    v2 dataset consists of the data sampled in the same way as v1, but with the resolution 16x16.
+    The data is made from cropping the central 16x16 patches from v1 stokes I, stokes V and velocities.
+    '''
+    stokes_I_path = os.path.join(v1_path, 'inputs/stokes_I/')
+    stokes_V_path = os.path.join(v1_path, 'inputs/stokes_V/')
+    velocities_path = os.path.join(v1_path, 'labels/')
+
+    taus = ["tau_1e-1"] #for now I only test on tau=1e-1
+
+    stokes_I = os.listdir(stokes_I_path)
+    stokes_V = os.listdir(stokes_V_path)
+
+    print("Creating Stokes I cropped data...")
+    for si in stokes_I:
+        crop_center_4_patches(stokes_I_path, si, 16, os.path.join(save_path, 'inputs/stokes_I/'))
+    print("Creating Stokes V cropped data...")
+    for sv in stokes_V:
+        crop_center_4_patches(stokes_V_path, sv, 16, os.path.join(save_path, 'inputs/stokes_V/'))
+    print("Creating velocities cropped data...")
+    for t in taus:
+        print("Processing tau: ", t)
+        velocities_specific_tau_path = os.path.join(velocities_path, t)
+        velocities_specific_tau = os.listdir(velocities_specific_tau_path)
+        for v in velocities_specific_tau:
+            crop_center_4_patches(velocities_specific_tau_path, v, 16, os.path.join(save_path, 'labels/', t))
 
 if (__name__ == '__main__'):
     
@@ -525,4 +604,19 @@ if (__name__ == '__main__'):
     #    create_dummy_datacubes(tau=t, save_path=main_root + "thesis/data/", dataset_version="v1")
     
     #create_downsampled_data(num_samples=25, dataset_version="v1")
-    create_last_2_layers_test_data(dataset_version="v1")
+    #create_last_2_layers_test_data(dataset_version="v1")
+    #create_dataset_v2(v1_path = main_root + "thesis/data/v1/dataset/train", save_path = main_root + "thesis/data/v2/dataset/train/")
+    #print(len(os.listdir(os.path.join(main_root, "thesis/data/v2/dataset/train/labels/tau_1e-1/"))))
+    #data = os.listdir(os.path.join(main_root, "thesis/data/v3/dataset/train/inputs/stokes_V/"))
+    #print(len(data))
+    #print(np.load(os.path.join(main_root, "thesis/data/v2/dataset/train/inputs/stokes_V/", data[0])).shape)
+
+    #FOR DATASET VERSION V3:
+    #create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v3")
+    #create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v3")
+
+    #FOR DATASET VERSION V4:
+    #create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v4")
+    #create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v4")
+    create_last_2_layers_test_data(dataset_version="v3")
+    create_last_2_layers_test_data(dataset_version="v4")

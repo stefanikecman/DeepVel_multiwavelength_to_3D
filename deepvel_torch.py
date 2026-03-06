@@ -35,10 +35,25 @@ class dataset_deepVel(Dataset):
         intensities.sort()
         velocities.sort()
 
-        self.intensities = intensities
-        self.velocities = velocities
+        if test == False:
+            for i in range(len(intensities)):
+                intensity_index = intensities[i].replace(f'stokes_{self.stokes_profile}_', '')
+                velocity_index = velocities[i].replace('velocities_', '')
 
-        self.n_train_datapoints = len(self.intensities)
+                if velocity_index != intensity_index:
+                    raise ValueError("Input (I) - label data not corresponding: ", intensities[i] + " "+ velocities[i])
+                
+            self.intensities = [torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32)) for f in intensities]
+            self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
+            
+            if self.out_channels == 1:
+                self.velocities = [vel[2,:,:].unsqueeze(0) for vel in self.velocities]
+
+        # self.intensities = intensities
+        # self.velocities = velocities
+        print("Loaded {} intensity files and {} velocity files.".format(len(self.intensities), len(self.velocities)))
+
+        self.n_train_datapoints = len(intensities)
         
         self.test = test
         self.test_idx = test_idx
@@ -84,17 +99,20 @@ class dataset_deepVel(Dataset):
         if self.test:
             idx = self.validation_idx[idx]
 
-        I = np.load(os.path.join(self.intensities_dir, self.intensities[idx]))
-        I = torch.from_numpy(I.astype(np.float32))  
+        # I = np.load(os.path.join(self.intensities_dir, self.intensities[idx]))
+        # I = torch.from_numpy(I.astype(np.float32))  
 
-        if self.out_channels == 1:
-            vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))[2,:,:]
-            vel = torch.from_numpy(vel.astype(np.float32)).unsqueeze(0)
-        else:
-            vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))
-            vel = torch.from_numpy(vel.astype(np.float32))
+        # if self.out_channels == 1:
+        #     vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))[2,:,:]
+        #     vel = torch.from_numpy(vel.astype(np.float32)).unsqueeze(0)
+        # else:
+        #     vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))
+        #     vel = torch.from_numpy(vel.astype(np.float32))
 
-        self.check_indices(idx, self.test)
+        # self.check_indices(idx, self.test)
+
+        I = self.intensities[idx]
+        vel = self.velocities[idx]
 
         return I, vel
     
@@ -176,7 +194,7 @@ class DeepVel_run(object):
     """
     Class for running the DeepVel model.
     """
-    def __init__(self, batch, dataset_path, network_path, tau, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, stokes_profile="I"):
+    def __init__(self, batch, dataset_path, network_path, tau, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, stokes_profile="I", test=False):
  
         self.root = root
         self.n_filters = 32     
@@ -197,7 +215,7 @@ class DeepVel_run(object):
 
         if root:
 
-            self.dataset = dataset_deepVel(dataset_path, tau = tau, test_idx = None, test = False, stokes_profile=self.stokes_profile, out_channels=self.out_channels)
+            self.dataset = dataset_deepVel(dataset_path, tau = tau, test_idx = None, test = test, stokes_profile=self.stokes_profile, out_channels=self.out_channels)
             self.train_len = int(0.8*len(self.dataset))
             self.test_len = len(self.dataset) - self.train_len
             self.trainset, self.testset = random_split(self.dataset, [self.train_len, self.test_len])
@@ -381,11 +399,17 @@ if (__name__ == '__main__'):
     output_shape = (1, 64, 64)    # (vz, height, width)
     
     # taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
-    taus = ["1e-2", "1e-3", "1e-4"]
-    stokes_profiles = ["I", "V"]
-    dataset_path = '/home/xenoss/dat/thesis/data/v1/dataset/train/'
+    taus = ["1e-1", "1e-2", "1e-2", "1e-3", "1e-4"] 
+    stokes_profiles = ["V", "I", "V", "V", "V"]
+    dataset_path = '/dat/xenoss/thesis/data/v1/dataset/train/'
 
-    for tau in taus:
-        for stokes_profile in stokes_profiles:
-            deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/home/xenoss/dat/thesis/models/v1/tau_{tau}/stokes_{stokes_profile.lower()}_vz_model/checkpoints/", stokes_profile=stokes_profile)
-            deepvel_net.train(200)  
+    # for tau in taus:
+    #     for stokes_profile in stokes_profiles:
+    #         deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
+    #         deepvel_net.train(200)  
+
+    for i in range(len(taus)):
+        tau = taus[i]
+        stokes_profile = stokes_profiles[i]
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
+        deepvel_net.train(200)

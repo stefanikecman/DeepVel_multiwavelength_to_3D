@@ -57,7 +57,8 @@ def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,s
         elif model_type[i] == ModelType.STOKES_V:
             model_glob = f"{ckpts_path}/tau_{tau}/stokes_v_model/checkpoints/*.npy"
         elif model_type[i] == ModelType.STOKES_IV:
-            model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model/checkpoints/*.npy"
+            # model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model/checkpoints/*.npy"
+            model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model_vz/checkpoints/*.npy"
 
         path = glob.glob(model_glob)[0]
         with open(path, "rb") as f:
