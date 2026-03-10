@@ -3,3 +3,4 @@ important_stats/
 stokesI_first_wavelength.png
 stokes_params_at_first_wavelength.png
 temp.py
+checkpointing.py

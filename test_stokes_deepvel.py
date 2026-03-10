@@ -7,7 +7,7 @@ from collections import OrderedDict
 from deepvel_torch import DeepVel_run
 import pandas as pd
 from analysis_fn import get_all_metrics, get_divergence, get_vorticity
-from metrics_and_plotting import ModelType, plot_prediction_and_scatter_full_map_vertical, plot_train_val_losses
+from metrics_and_plotting import ModelType, plot_prediction_and_scatter_full_map_vertical, plot_train_val_losses, infer_with_sliding_windows
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -27,7 +27,7 @@ metrics_by_tau = OrderedDict()
 
 
 ########## NOTE TESTING STOKES MODELS ON LAST 2 LAYERS OF SIMULATION ################
-test_path = '/home/xenoss/dat/thesis/data/v1/dataset/test/last_2_layers/'
+# test_path = '/home/xenoss/dat/thesis/data/v1/dataset/test/last_2_layers/'
 
 # checkpoints_I = [
 #     "/home/xenoss/dat/thesis/models/v1/tau_1.0/stokes_i_model/checkpoints/DeepVel_torch_epoch_188_0.08415.pt", #tau=1.0
@@ -47,7 +47,7 @@ checkpoints_V = [
 
 checkpoints = checkpoints_V
 taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
-# model_names = ["Stokes_I"]
+#model_names = ["Stokes_I"]
 model_names = ["Stokes_V"]
 version = "v1"
 model_paths = ["/home/xenoss/dat/thesis/models/"]
@@ -55,12 +55,14 @@ model_types = [ModelType.STOKES_V, ModelType.STOKES_V, ModelType.STOKES_V, Model
 input_shape = (2, 43, 64, 64)
 # stokes_profile = "I"
 stokes_profile = "V"
-#csvs = ["stokes_I_last2_tau_1.0", "stokes_I_last2_tau_1e-1", "stokes_I_last2_tau_1e-2", "stokes_I_last2_tau_1e-3", "stokes_I_last2_tau_1e-4"]
-csvs = ["stokes_V_last2_tau_1.0", "stokes_V_last2_tau_1e-1", "stokes_V_last2_tau_1e-2", "stokes_V_last2_tau_1e-3", "stokes_V_last2_tau_1e-4"]
-
+# csvs = ["stokes_I_last2_tau_1.0", "stokes_I_last2_tau_1e-1", "stokes_I_last2_tau_1e-2", "stokes_I_last2_tau_1e-3", "stokes_I_last2_tau_1e-4"]
+# # csvs = ["stokes_V_last2_tau_1.0", "stokes_V_last2_tau_1e-1", "stokes_V_last2_tau_1e-2", "stokes_V_last2_tau_1e-3", "stokes_V_last2_tau_1e-4"]
+# common_csv = []
 # for i, ckpt in enumerate(checkpoints):
 
-#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, batch = 8, dataset_path = dataset_path, network_path = f"/home/xenoss/dat/thesis/models/v1/tau_{taus[i]}/stokes_{stokes_profile.lower()}_model/checkpoints/", stokes_profile=stokes_profile)
+#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, batch = 8, dataset_path = dataset_path, 
+#                               network_path = f"/home/xenoss/dat/thesis/models/v1/tau_{taus[i]}/stokes_{stokes_profile.lower()}_model/checkpoints/", 
+#                               stokes_profile=stokes_profile, test=True)
 #     params_model = ckpt
 
 #     if model_types[i] == ModelType.STOKES_I:
@@ -81,7 +83,8 @@ csvs = ["stokes_V_last2_tau_1.0", "stokes_V_last2_tau_1e-1", "stokes_V_last2_tau
 #         input = torch.from_numpy(np.load(os.path.join(input_path, input_test_data[j])).astype(np.float32))
 #         ground_truth = torch.from_numpy(np.load(os.path.join(vel_path, vel_test_data[j])).astype(np.float32))[0]
 #         print("GT shape:", ground_truth.shape)
-#         prediction = deepvel_net.predict(input,params_model)    
+#         #prediction = deepvel_net.predict(input,params_model)    
+#         prediction = infer_with_sliding_windows(deepvel_net, params_model, input=torch.from_numpy(np.array([input])), window=64, overlap=0)
 
 #         divergence_orig = get_divergence(ground_truth[0], ground_truth[1])
 #         divergence_pred = get_divergence(prediction[0], prediction[1])
@@ -121,10 +124,14 @@ csvs = ["stokes_V_last2_tau_1.0", "stokes_V_last2_tau_1e-1", "stokes_V_last2_tau
 #     avg_row = avg_series.to_dict()
 #     avg_row['tau'] = taus[i]
 #     avg_row['sample_index'] = 'AVERAGE'
+#     common_csv.append(avg_row)
 #     df_tau = pd.concat([df_tau, pd.DataFrame([avg_row])], ignore_index=True)
 
-#     csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_metrics_tau_{taus[i]}.csv')
+#     csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_metrics_tau_{taus[i]}_SLIDING_WINDOWS.csv')
 #     df_tau.to_csv(csv_path_tau, index=False)
+# csv_path_tau_all = os.path.join(csv_dir, f'all_{csvs[i]}_metrics_SLIDING_WINDOWS.csv')
+# df_tau_all = pd.DataFrame(common_csv)
+# df_tau_all.to_csv(csv_path_tau_all, index=False)
 
 #######################################################################################
 
@@ -150,7 +157,8 @@ for i, tau in enumerate(taus):
 
     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}_model/checkpoints/"
     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}_model/test/"
-    deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, tau=taus[i], stokes_profile=stokes_profile)
+    deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, 
+                              tau=taus[i], stokes_profile=stokes_profile, test=True)
     params_model = checkpoints[i]
     print(f"Evaluating model for tau = {taus[i]} ...")
     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
@@ -158,6 +166,21 @@ for i, tau in enumerate(taus):
                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
                 plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
                 write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-                title = model_names[0]+", tau = " + taus[i], tau = taus[i])
+                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=True)
+    
+for i, tau in enumerate(taus):
+
+    model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}_model/checkpoints/"
+    test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}_model/test/"
+    deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, 
+                              tau=taus[i], stokes_profile=stokes_profile, test=True)
+    params_model = checkpoints[i]
+    print(f"Evaluating model for tau = {taus[i]} ...")
+    plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
+                dataset_path = test_path, test_save_path = test_save_path, 
+                name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
+                plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
+                write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
+                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=True)
     
 #######################################################################################

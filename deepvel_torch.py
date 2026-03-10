@@ -51,7 +51,6 @@ class dataset_deepVel(Dataset):
 
         # self.intensities = intensities
         # self.velocities = velocities
-        print("Loaded {} intensity files and {} velocity files.".format(len(self.intensities), len(self.velocities)))
 
         self.n_train_datapoints = len(intensities)
         
@@ -153,6 +152,12 @@ class DeepVel_net(nn.Module):
         self.blocks = blocks
         
         self.conv1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        # TODO increase the kernel size to 5 or 6
+        # Add avg pooling or max pooling around 3, 5 to shrink the wavelengths after every convolutional layer
+        # decrease the number of filters to 
+        # change the kernel and stride to be different in wav and spatial dimensions
+        #in the beginning have bigger kernels and then decrease them. not go above 10 and below 3
+
         self.residual = self.make_Reslayer(self.n_filters, self.blocks)
         self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm3d(self.n_filters))
         self.adapt_pool = nn.AdaptiveAvgPool3d((1, None, None))
@@ -189,6 +194,67 @@ class DeepVel_net(nn.Module):
         out = out.squeeze(2)
         return out
 
+class DeepVel_net2(nn.Module):
+    """
+    Model definition. Modified original DeepVel_net:
+    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
+    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
+    - decreased the number of filters to reduce the number of parameters
+    - added Max pooling in the wavelength domain
+    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
+    """
+    def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
+        super(DeepVel_net2, self).__init__()
+
+        self.n_filters = n_filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.blocks = blocks
+        
+        self.conv1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (10, 5, 5), stride=1, padding=(2,2,2)), nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        self.pool1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
+        self.residual = self.make_Reslayer(self.n_filters, self.blocks)
+        self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), nn.BatchNorm3d(self.n_filters))
+        self.pool2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.pool_res = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.conv3 = nn.Conv3d(self.n_filters, self.out_channels, kernel_size = (1, 1, 1), stride=1, padding=0)
+        self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
+
+    def make_Reslayer(self, out_channels, num_blocks, stride=1):
+            """
+            Create a sequence of residual blocks.
+            Args:
+                out_channels: Number of output channels for each block
+                num_blocks: Number of residual blocks to create
+                stride: Stride for the first block (default is 1)
+            Returns:
+                A sequential container of residual blocks
+            """
+            strides = [stride] + [1]*(num_blocks-1)
+            layers = []
+            for stride in strides:
+                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
+                self.n_filters = out_channels
+            return nn.Sequential(*layers)
+
+    def forward(self, x):
+        """
+        Forward pass through the network.
+        """
+        out = self.conv1(x)
+        out = self.pool1(out)
+        res = out
+        out = self.residual(out)
+        out = self.conv2(out)
+        out = self.pool2(out)
+        out += self.pool_res(res)  #to match depth after pool2        
+        out = self.conv3(out)
+        out = self.max_pool(out)
+        out = self.adapt_pool(out)
+        out = out.squeeze(2)
+        return out
+
 
 class DeepVel_run(object):
     """
@@ -197,7 +263,7 @@ class DeepVel_run(object):
     def __init__(self, batch, dataset_path, network_path, tau, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, stokes_profile="I", test=False):
  
         self.root = root
-        self.n_filters = 32     
+        self.n_filters = 16  
         self.batch_size = batch
         self.n_conv_layers = 20 
         self.lr = 1e-4
@@ -356,9 +422,10 @@ class DeepVel_run(object):
                 Predicted velocity field with a size torch.Size([2, H, W])
 
         """
-
-        model_weights = torch.load(saved_model, map_location=torch.device(device), weights_only=False)['state_dict']
+        model_weights = torch.load(saved_model, map_location=torch.device(device))
         
+        if isinstance(model_weights, dict) and 'state_dict' in model_weights:
+            model_weights = model_weights['state_dict']
         if isinstance(self.model, nn.DataParallel):
             self.model.module.load_state_dict(model_weights)
         else:

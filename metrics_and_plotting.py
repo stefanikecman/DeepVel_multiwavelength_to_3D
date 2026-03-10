@@ -24,6 +24,37 @@ class ModelType(Enum):
     DEEPVEL_Vz = 8
     HYBRID_Ivz = 9
 
+def infer_with_sliding_windows(model, params_model, input, window=128, overlap=16):
+
+    n_data, _, _, H, W = np.array(input).shape
+    
+    #output = torch.zeros(3, H, W) #TODO make it flexible wrt output shape
+    print("Input shape:", np.array(input).shape)
+    hybrid = True if  n_data== 2 else False
+    first = True
+    for y in range(0, H, window-overlap):
+        for x in range(0, W, window-overlap):
+
+            if hybrid:
+                I_patch = input[0, :, :, y:y+window, x:x+window]
+                V_patch = input[1, :, :, y:y+window, x:x+window]
+                pred = model.predict(I_patch, V_patch, params_model)
+                if first:
+                    output_channels = pred.shape[0]
+                    output = torch.zeros(output_channels, H, W)
+                    first = False
+
+            else:
+                input_patch = input[0, :, :, y:y+window, x:x+window]
+                pred = model.predict(input_patch, params_model)
+                if first:
+                    output_channels = pred.shape[0]
+                    output = torch.zeros(output_channels, H, W)
+                    first = False
+
+            output[:, y:y+window, x:x+window] = pred
+    return output
+
 def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,save_path, name):
     """
     Method for plot_train_val_losses
@@ -58,7 +89,7 @@ def plot_train_val_losses(tau_levels, ckpts_path, model_type: ModelType, title,s
             model_glob = f"{ckpts_path}/tau_{tau}/stokes_v_model/checkpoints/*.npy"
         elif model_type[i] == ModelType.STOKES_IV:
             # model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model/checkpoints/*.npy"
-            model_glob = f"{ckpts_path}/tau_{tau}/hybrid_model_vz/checkpoints/*.npy"
+            model_glob = f"{ckpts_path}/tau_{tau}/hybrid_vz/checkpoints/*.npy"
 
         path = glob.glob(model_glob)[0]
         with open(path, "rb") as f:
@@ -180,7 +211,7 @@ def add_colorbar(im, ax, label=None):
         cbar.set_label(label)
     return cbar
 
-def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type: ModelType, tau = None, zoomed_in_size = None):
+def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type: ModelType, tau = None, zoomed_in_size = None, sliding_windows = False):
 
     inputs = load_data_based_on_model_type(dataset_path, n_input_channels, model_type, tau)
 
@@ -190,6 +221,10 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
         velocity_full_map = np.load(os.path.join(dataset_path, f"labels/tau_{tau}/velocities_tau_{tau}.npy"))
     else:
         velocity_full_map = np.load(os.path.join(dataset_path, f"labels/velocities_{n_input_channels}.npy"))
+    if model_type == ModelType.STOKES_IV: #TODO: refactor to work with different shapes of velocities, currently only works with 3 channels
+        print("Velocity full map shape before slicing:", velocity_full_map.shape)
+        velocity_full_map = velocity_full_map[:, 2, :, :]
+        print("Velocity full map shape after slicing:", velocity_full_map.shape)
 
     if velocity_full_map.ndim == 4:
         velocity_full_map = velocity_full_map[0]
@@ -253,13 +288,26 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
         velocity_pred = deepvel_object.predict(vz_to_plot, params_model)
 
     elif model_type == ModelType.STOKES_I:
-        velocity_pred = deepvel_object.predict(stokes_I_to_plot, params_model)
+        if sliding_windows:
+            print("Predicting with sliding windows")
+            velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_I_to_plot])), window=64, overlap=0)
+        else:
+            velocity_pred = deepvel_object.predict(stokes_I_to_plot, params_model)
 
     elif model_type == ModelType.STOKES_V:
-        velocity_pred = deepvel_object.predict(stokes_V_to_plot, params_model)
+        if sliding_windows:
+            print("Predicting with sliding windows")
+            velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_V_to_plot])), window=64, overlap=0)
+        else:   
+            velocity_pred = deepvel_object.predict(stokes_V_to_plot, params_model)
         
     elif model_type == ModelType.STOKES_IV:
-        velocity_pred = deepvel_object.predict(stokes_I_to_plot, stokes_V_to_plot, params_model)
+        if sliding_windows:
+            print("Predicting with sliding windows")
+            velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_I_to_plot, stokes_V_to_plot])), window=64, overlap=0)
+        else:
+            velocity_pred = deepvel_object.predict(stokes_I_to_plot, stokes_V_to_plot, params_model)
+            print("velocity_pred shape:", velocity_pred.shape)
 
     return inputs, velocity_to_plot, velocity_pred
 
@@ -537,7 +585,8 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
 
 
 def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = False, n_input_channels = 2, 
-                                                   scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, mean_vel = None, std_vel = None, return_metrics = False, model_type = ModelType.DEEPVEL_I, title = None, tau = None):
+                                                   scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, mean_vel = None, std_vel = None, return_metrics = False, 
+                                                   model_type = ModelType.DEEPVEL_I, title = None, tau = None, sliding_windows = False):
     """
     Plot predictions and scatter plots for a full map in a vertical layout.
     Args:
@@ -559,9 +608,11 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         tau: Optional optical depth parameter
     """
     #TODO refactor to work with different shapes of velocities! 
-    plt.rcParams['font.size'] = 40
+    plt.rcParams['font.size'] = 50
 
-    inputs, velocity_to_plot, velocity_pred = load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type, tau, zoomed_in_size)
+    inputs, velocity_to_plot, velocity_pred = load_data_and_get_predictions(deepvel_object, params_model, dataset_path, 
+                                                                            n_input_channels, model_type, tau, zoomed_in_size, 
+                                                                            sliding_windows = sliding_windows)
     intensity_to_plot = inputs["intensity"]
 
     extent = [0, velocity_to_plot.shape[2]*0.016, 0, velocity_to_plot.shape[1]*0.016]
@@ -575,24 +626,28 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     # plt.figure()
 
     nrows = 4 if plot_intensity else 3
-    ncols = 2 if velocity_to_plot.shape[0]==2 else 3
+    ncols = velocity_to_plot.shape[0]    
 
     if velocity_to_plot.shape[0]==3: figsize = (42, 47)
-    else: figsize=(37, 45)
+    elif velocity_to_plot.shape[0]==2: figsize=(37, 50)
+    else: figsize = (15, 50)
 
-    fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize)
-    plt.subplots_adjust(hspace=0.4)
-
+    # fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize, squeeze=False, constrained_layout=True)
+    # plt.subplots_adjust(hspace=0.4)
+    fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize, squeeze=False)
+    plt.subplots_adjust(hspace=0.35, top=0.90, bottom=0.08, right=0.92)
 
     if plot_intensity == True:
         intensity_0 = intensity_to_plot[n_input_channels/2 -1, :, :].cpu().numpy()
         intensity_1 = intensity_to_plot[n_input_channels/2, :, :].cpu().numpy()
 
     vel_0 = velocity_to_plot[0, :, :].cpu().numpy()
-    vel_1 = velocity_to_plot[1, :, :].cpu().numpy() 
-
     vel_0_pred = velocity_pred[0, :, :].cpu().numpy()
-    vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
+    
+    print("Velocity to plot shape is: ", velocity_to_plot.shape)
+    if velocity_to_plot.shape[0]>1:
+        vel_1 = velocity_to_plot[1, :, :].cpu().numpy()
+        vel_1_pred = velocity_pred[1, :, :].cpu().numpy()
 
     if velocity_to_plot.shape[0]==3:
         vel_2 = velocity_to_plot[2, :, :].cpu().numpy()
@@ -621,13 +676,13 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     if denormalized:
         if std_vel is None:
             std_vel_x = np.std(vel_0)
-            std_vel_y = np.std(vel_1)
+            std_vel_y = np.std(vel_1) if velocity_to_plot.shape[0]>1 else std_vel_x
             if velocity_to_plot.shape[0]==3:
                 std_vel_z = np.std(vel_2)
         else:
             if len(std_vel) > 1:
                 std_vel_x = std_vel[0]
-                std_vel_y = std_vel[1]
+                std_vel_y = std_vel[1] if velocity_to_plot.shape[0]>1 else std_vel_x
                 vmin = -3*max(std_vel_x, std_vel_y)/1e5
                 vmax = -1*vmin
                 if velocity_to_plot.shape[0]==3:
@@ -644,13 +699,14 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     if denormalized:
         if len(mean_vel) > 1:
-            mean_vel_x = mean_vel[0]
-            mean_vel_y = mean_vel[1]
-            
+            mean_vel_x = mean_vel[0]          
             vel_0 = denormalize_data(vel_0, mean_vel_x, std_vel_x)/1e5
-            vel_1 = denormalize_data(vel_1, mean_vel_y, std_vel_y)/1e5
             vel_0_pred = denormalize_data(vel_0_pred, mean_vel_x, std_vel_x)/1e5
-            vel_1_pred = denormalize_data(vel_1_pred, mean_vel_y, std_vel_y)/1e5
+
+            if velocity_to_plot.shape[0]>1:
+                mean_vel_y = mean_vel[1]
+                vel_1 = denormalize_data(vel_1, mean_vel_y, std_vel_y)/1e5
+                vel_1_pred = denormalize_data(vel_1_pred, mean_vel_y, std_vel_y)/1e5
 
             if velocity_to_plot.shape[0]==3:
                 mean_vel_z = mean_vel[2]
@@ -658,25 +714,35 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
                 vel_2_pred = denormalize_data(vel_2_pred, mean_vel_z, std_vel_z)/1e5
         else:
             vel_0 = denormalize_data(vel_0, mean_vel[0], std_vel[0])/1e5
-            vel_1 = denormalize_data(vel_1, mean_vel[0], std_vel[0])/1e5
             vel_0_pred = denormalize_data(vel_0_pred, mean_vel[0], std_vel[0])/1e5
-            vel_1_pred = denormalize_data(vel_1_pred, mean_vel[0], std_vel[0])/1e5
+
+            if velocity_to_plot.shape[0]>1:
+                vel_1 = denormalize_data(vel_1, mean_vel[0], std_vel[0])/1e5
+                vel_1_pred = denormalize_data(vel_1_pred, mean_vel[0], std_vel[0])/1e5
 
             if velocity_to_plot.shape[0]==3:
                 vel_2 = denormalize_data(vel_2, mean_vel[0], std_vel[0])/1e5
                 vel_2_pred = denormalize_data(vel_2_pred, mean_vel[0], std_vel[0])/1e5
 
-    im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
-    ax[idx][0].set_title('vx - ground truth', pad = 20)
-    ax[idx][0].set_xlabel('x [Mm]')
-    ax[idx][0].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[idx][0])
+    if velocity_to_plot.shape[0]==1:
+        im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][0].set_title('vz - ground truth', pad = 20)
+        ax[idx][0].set_xlabel('x [Mm]')
+        ax[idx][0].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][0])
 
-    ax[idx][1].imshow(vel_1.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
-    ax[idx][1].set_title('vy - ground truth', pad = 20)
-    ax[idx][1].set_xlabel('x [Mm]')
-    ax[idx][1].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[idx][1])
+    if velocity_to_plot.shape[0]>1:
+        im = ax[idx][0].imshow(vel_0.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][0].set_title('vx - ground truth', pad = 20)
+        ax[idx][0].set_xlabel('x [Mm]')
+        ax[idx][0].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][0])
+
+        ax[idx][1].imshow(vel_1.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][1].set_title('vy - ground truth', pad = 20)
+        ax[idx][1].set_xlabel('x [Mm]')
+        ax[idx][1].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][1])
 
     if velocity_to_plot.shape[0]==3:
 
@@ -688,17 +754,25 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     idx +=1
 
-    ax[idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
-    ax[idx][0].set_title('vx - predicted', pad = 20)
-    ax[idx][0].set_xlabel('x [Mm]')
-    ax[idx][0].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[idx][0])
+    if velocity_to_plot.shape[0]==1:
+        im = ax[idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][0].set_title('vz - predicted', pad = 20)
+        ax[idx][0].set_xlabel('x [Mm]')
+        ax[idx][0].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][0])
+    
+    if velocity_to_plot.shape[0]>1:
+        ax[idx][0].imshow(vel_0_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][0].set_title('vx - predicted', pad = 20)
+        ax[idx][0].set_xlabel('x [Mm]')
+        ax[idx][0].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][0])
 
-    ax[idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
-    ax[idx][1].set_title('vy - predicted', pad = 20)
-    ax[idx][1].set_xlabel('x [Mm]')
-    ax[idx][1].set_ylabel('y [Mm]')
-    cbar = add_colorbar(im, ax[idx][1])
+        ax[idx][1].imshow(vel_1_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
+        ax[idx][1].set_title('vy - predicted', pad = 20)
+        ax[idx][1].set_xlabel('x [Mm]')
+        ax[idx][1].set_ylabel('y [Mm]')
+        cbar = add_colorbar(im, ax[idx][1])
 
     if velocity_to_plot.shape[0]==3:
         ax[idx][2].imshow(vel_2_pred.T, cmap='bwr', vmin = vmin, vmax = vmax, origin = 'lower', extent = extent, aspect='auto')
@@ -709,21 +783,31 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     idx +=1
 
-    im = ax[idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
-    min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
-    max0 = max(vel_0.max(), vel_0_pred.max()) + zoom_out
-    ax[idx][0].plot([min0, max0], [min0, max0], color = 'red') 
-    ax[idx][0].set_title('Vx - original vs predicted', pad = 20)
-    ax[idx][0].set_xlabel('Original data')
-    ax[idx][0].set_ylabel('Predicted data')
+    if velocity_to_plot.shape[0]==1:
+        im = ax[idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
+        min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
+        max0 = max(vel_0.max(), vel_0_pred.max()) + zoom_out
+        ax[idx][0].plot([min0, max0], [min0, max0], color = 'red') 
+        ax[idx][0].set_title('Vz - original vs predicted', pad = 20)
+        ax[idx][0].set_xlabel('Original data')
+        ax[idx][0].set_ylabel('Predicted data')
+    
+    if velocity_to_plot.shape[0]>1:
+        im = ax[idx][0].scatter(vel_0.flatten(), vel_0_pred.flatten(), alpha = 0.05, linewidths = 0.7)
+        min0 = min(vel_0.min(), vel_0_pred.min()) - zoom_out
+        max0 = max(vel_0.max(), vel_0_pred.max()) + zoom_out
+        ax[idx][0].plot([min0, max0], [min0, max0], color = 'red') 
+        ax[idx][0].set_title('Vx - original vs predicted', pad = 20)
+        ax[idx][0].set_xlabel('Original data')
+        ax[idx][0].set_ylabel('Predicted data')
 
-    im = ax[idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05, linewidths = 0.7)
-    min1 = min(vel_1.min(), vel_1_pred.min()) - zoom_out
-    max1 = max(vel_1.max(), vel_1_pred.max()) + zoom_out
-    ax[idx][1].plot([min1, max1], [min1, max1], color = 'red') 
-    ax[idx][1].set_title('Vy - original vs predicted', pad = 20)
-    ax[idx][1].set_xlabel('Original data')
-    ax[idx][1].set_ylabel('Predicted data')
+        im = ax[idx][1].scatter(vel_1.flatten(), vel_1_pred.flatten(), alpha = 0.05, linewidths = 0.7)
+        min1 = min(vel_1.min(), vel_1_pred.min()) - zoom_out
+        max1 = max(vel_1.max(), vel_1_pred.max()) + zoom_out
+        ax[idx][1].plot([min1, max1], [min1, max1], color = 'red') 
+        ax[idx][1].set_title('Vy - original vs predicted', pad = 20)
+        ax[idx][1].set_xlabel('Original data')
+        ax[idx][1].set_ylabel('Predicted data')
 
     if velocity_to_plot.shape[0]==3:
         im = ax[idx][2].scatter(vel_2.flatten(), vel_2_pred.flatten(), alpha = 0.05, linewidths = 0.7)
@@ -734,21 +818,28 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         ax[idx][2].set_xlabel('Original data')
         ax[idx][2].set_ylabel('Predicted data')
         
-    
-    divergence_orig = get_divergence(vel_0, vel_1)
-    divergence_pred = get_divergence(vel_0_pred, vel_1_pred)
-    vorticity_orig = get_vorticity(vel_0, vel_1)
-    vorticity_pred = get_vorticity(vel_0_pred, vel_1_pred)
+    if velocity_to_plot.shape[0]>1:
+        divergence_orig = get_divergence(vel_0, vel_1)
+        divergence_pred = get_divergence(vel_0_pred, vel_1_pred)
+        vorticity_orig = get_vorticity(vel_0, vel_1)
+        vorticity_pred = get_vorticity(vel_0_pred, vel_1_pred)
 
-    if velocity_to_plot.shape[0]==3:
+    if velocity_to_plot.shape[0]==1:
+        mse_l, rmse_l, pearson2, slope_z = get_all_metrics(velocity_to_plot, velocity_pred).values()
+    elif velocity_to_plot.shape[0]==3:
         mse_l, rmse_l, pearson0, pearson1, pearson2, slope_x, slope_y, slope_z = get_all_metrics(velocity_to_plot, velocity_pred).values()
     else:
         mse_l, rmse_l, pearson0, pearson1, slope_x, slope_y = get_all_metrics(velocity_to_plot, velocity_pred).values()
-    mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
-    mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
+    
+    if velocity_to_plot.shape[0]>1:
+        mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
+        mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
 
     if write_metrics: 
-        if velocity_to_plot.shape[0]==3:
+        if velocity_to_plot.shape[0]==1:
+            fig.text(0.5, 0.05, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vz: {pearson2:.3f}, Slope Vz: {slope_z:.3f}', 
+             ha='center', fontsize=16)
+        elif velocity_to_plot.shape[0]==3:
             fig.text(0.5, 0.05, f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Pearson Vz: {pearson2:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}, Slope Vz: {slope_z:.3f}', 
              ha='center', fontsize=16)
             
@@ -759,23 +850,37 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     else: 
         if velocity_to_plot.shape[0]==3:
             print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Pearson Vz: {pearson2:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}, Slope Vz: {slope_z:.3f}')
+        elif velocity_to_plot.shape[0]==1:
+            print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vz: {pearson2:.3f}, Slope Vz: {slope_z:.3f}')
         else:
             print(f'MSE Loss: {mse_l:.4f}, Root MSE Loss: {rmse_l:.4f}, Pearson Vx: {pearson0:.3f}, Pearson Vy: {pearson1:.3f}, Slope Vx: {slope_x:.3f}, Slope Vy: {slope_y:.3f}')
-        print(f'Divergence - MSE Loss: {mse_d:.4f}, Root MSE Loss: {rmse_d:.4f}, Pearson: {pearson_d:.3f}, Slope: {slope_d:.3f}')
-        print(f'Vorticity - MSE Loss: {mse_v:.4f}, Root MSE Loss: {rmse_v:.4f}, Pearson: {pearson_v:.3f}, Slope: {slope_v:.3f}')
-    
+        if velocity_to_plot.shape[0]>1:
+            print(f'Divergence - MSE Loss: {mse_d:.4f}, Root MSE Loss: {rmse_d:.4f}, Pearson: {pearson_d:.3f}, Slope: {slope_d:.3f}')
+            print(f'Vorticity - MSE Loss: {mse_v:.4f}, Root MSE Loss: {rmse_v:.4f}, Pearson: {pearson_v:.3f}, Slope: {slope_v:.3f}')
+        
     if title is not None:
-        if denormalized: title = title + ' (denormalized)'
-        plt.suptitle(title, fontsize=70, y=0.98)
+        if denormalized: title = title + '\n (denormalized)'
+        if sliding_windows: title = title + '\n (sliding windows)'
+        plt.suptitle(title, fontsize=50, y=0.98, wrap=True)
 
     if test_save_path is not None:
         if denormalized:
-            fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_' + name + '.png'))
+            if sliding_windows:
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_sliding_windows_' + name + '_DV2.png'))
+            else:
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_' + name + '_DV2.png'))
         else:
-            fig.savefig(os.path.join(test_save_path, 'full_analysis_' + name + '.png'))
+            if sliding_windows:
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_sliding_windows_' + name + '_DV2.png'))
+            else:
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_' + name + '_DV2.png'))
     plt.close(fig)
 
     if return_metrics:
+        if velocity_to_plot.shape[0]==1:
+            return {
+                "mse": mse_l, "rmse": rmse_l, "pearson_vz": pearson2, "slope_vz": slope_z
+            }
         if velocity_to_plot.shape[0]==3:
             return {
                 "mse": mse_l, "rmse": rmse_l, "pearson_vx": pearson0, "pearson_vy": pearson1, "pearson_vz": pearson2, "slope_vx": slope_x, "slope_vy": slope_y, "slope_vz": slope_z,

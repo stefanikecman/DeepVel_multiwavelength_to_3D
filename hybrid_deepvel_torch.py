@@ -224,6 +224,107 @@ class DeepVel_net(nn.Module):
         out = out.squeeze(2)
 
         return out
+    
+class DeepVel_net2(nn.Module):
+    """
+    Model definition. Modified original DeepVel_net:
+    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
+    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
+    - decreased the number of filters to reduce the number of parameters
+    - added Max pooling in the wavelength domain
+    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
+    """
+    def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
+        super(DeepVel_net2, self).__init__()
+
+        self.n_filters = n_filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.blocks = blocks
+        
+
+        self.conv_I_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (10, 5, 5), stride=1, padding=(2,2,2)),
+                                       nn.BatchNorm3d(self.n_filters),
+                                       nn.ReLU(inplace=True)
+                                       )
+        self.pool_I_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
+
+        self.conv_V_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (10, 5, 5), stride=1, padding=(2,2,2)),
+                                        nn.BatchNorm3d(self.n_filters),
+                                        nn.ReLU(inplace=True)
+                                        )
+        self.pool_V_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
+
+        self.residual2 = self.make_Reslayer(self.n_filters, self.blocks)
+        self.residual3 = self.make_Reslayer(self.n_filters, self.blocks)
+
+        self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
+                                      nn.BatchNorm3d(self.n_filters))
+        
+        self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
+                                      nn.BatchNorm3d(self.n_filters))
+        
+        self.pool_I_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.pool_V_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+
+        self.pool_res_I = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.pool_res_V = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+
+        self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
+        self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
+        
+
+    def make_Reslayer(self, out_channels, num_blocks, stride=1):
+            """
+            Create a sequence of residual blocks.
+            Args:
+                out_channels: Number of output channels for each block
+                num_blocks: Number of residual blocks to create
+                stride: Stride for the first block (default is 1)
+            Returns:
+                A sequential container of residual blocks
+            """
+            strides = [stride] + [1]*(num_blocks-1)
+            layers = []
+            for stride in strides:
+                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
+                self.n_filters = out_channels
+            return nn.Sequential(*layers)
+
+    def forward(self, I, V):
+        """
+        Forward pass through the network.
+        """  
+
+        out_I = self.conv_I_1(I)
+        out_I = self.pool_I_1(out_I)
+        res_I = out_I
+
+        out_V = self.conv_V_1(V)
+        out_V = self.pool_V_1(out_V)
+        res_V = out_V
+
+        out_I = self.residual2(out_I)
+        out_I = self.conv_I_2(out_I)
+        out_I = self.pool_I_2(out_I)
+        out_I += self.pool_res_I(res_I)
+        
+
+        out_V = self.residual3(out_V)
+        out_V = self.conv_V_2(out_V)
+        out_V = self.pool_V_2(out_V)
+        out_V += self.pool_res_V(res_V)
+
+        feat_ensemble = torch.cat((out_I, out_V), dim=1)
+
+        out = self.conv3(feat_ensemble)
+        out = self.max_pool(out)
+        out = self.adapt_pool(out)
+        out = out.squeeze(2)
+
+        return out
+
 
 
 class DeepVel_run(object):
@@ -233,7 +334,7 @@ class DeepVel_run(object):
     def __init__(self, batch, dataset_path, network_path, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, tau = None, test=False):
  
         self.root = root
-        self.n_filters = 32     
+        self.n_filters = 16     
         self.batch_size = batch
         self.n_conv_layers = 20
         self.tau = tau
@@ -241,7 +342,7 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.lr = 1e-4
         self.network_path = network_path
-        self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
+        self.model = DeepVel_net2(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
 
@@ -438,5 +539,5 @@ if (__name__ == '__main__'):
     output_shape = (1, 16, 16)    # (vz, height, width)
 
     for tau in taus:
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape,batch = 32, dataset_path = dataset_path, network_path = f"/scratch/xenoss/hybrid_vz_16x16_v4/tau_{tau}/checkpoints/")
-        deepvel_net.train(200)
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape,batch = 32, dataset_path = dataset_path, network_path = f"/scratch/xenoss/hybrid_vz_16x16_v4_DV2/tau_{tau}/checkpoints/")
+        deepvel_net.train(50)
