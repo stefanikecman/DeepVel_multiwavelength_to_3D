@@ -43,7 +43,7 @@ class dataset_deepVel(Dataset):
                 if velocity_index != intensity_index:
                     raise ValueError("Input (I) - label data not corresponding: ", intensities[i] + " "+ velocities[i])
                 
-            self.intensities = [torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32)) for f in intensities]
+            self.intensities = [torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32)) for f in intensities] #NOTE unsqueeze for v5 only, patch
             self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
             
             if self.out_channels == 1:
@@ -255,6 +255,68 @@ class DeepVel_net2(nn.Module):
         out = out.squeeze(2)
         return out
 
+class DeepVel_net3(nn.Module):
+    """
+    Version suitable for v5 dataset, 519 wavelengths, therefore more pooling in the wavelength domain is needed.
+
+    Model definition. Modified original DeepVel_net:
+    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
+    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
+    - decreased the number of filters to reduce the number of parameters
+    - added Max pooling in the wavelength domain
+    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
+    """
+    def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
+        super(DeepVel_net3, self).__init__()
+
+        self.n_filters = n_filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.blocks = blocks
+        
+        self.conv1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)), nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        self.pool1 = nn.MaxPool3d(kernel_size=(15, 1, 1), stride=(15, 1, 1))
+        self.residual = self.make_Reslayer(self.n_filters, self.blocks)
+        self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), nn.BatchNorm3d(self.n_filters))
+        self.pool2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        self.pool_res = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        self.conv3 = nn.Conv3d(self.n_filters, self.out_channels, kernel_size = (1, 1, 1), stride=1, padding=0)
+        # self.max_pool = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
+
+    def make_Reslayer(self, out_channels, num_blocks, stride=1):
+            """
+            Create a sequence of residual blocks.
+            Args:
+                out_channels: Number of output channels for each block
+                num_blocks: Number of residual blocks to create
+                stride: Stride for the first block (default is 1)
+            Returns:
+                A sequential container of residual blocks
+            """
+            strides = [stride] + [1]*(num_blocks-1)
+            layers = []
+            for stride in strides:
+                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
+                self.n_filters = out_channels
+            return nn.Sequential(*layers)
+
+    def forward(self, x):
+        """
+        Forward pass through the network.
+        """
+        out = self.conv1(x)
+        out = self.pool1(out)
+        res = out
+        out = self.residual(out)
+        out = self.conv2(out)
+        out = self.pool2(out)
+        out += self.pool_res(res)  #to match depth after pool2        
+        out = self.conv3(out)
+        # out = self.max_pool(out)
+        out = self.adapt_pool(out)
+        out = out.squeeze(2)
+        return out
 
 class DeepVel_run(object):
     """
@@ -272,7 +334,7 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.stokes_profile = stokes_profile
 
-        self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
+        self.model = DeepVel_net3(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
 
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
@@ -461,15 +523,21 @@ if (__name__ == '__main__'):
 
     main_root = "/dat/xenoss/"
     ###### NOTE best version ######
-    input_shape = (2, 43, 64, 64)  # (channels, wavelengths, height, width)
+    # input_shape = (2, 43, 64, 64)  # (channels, wavelengths, height, width)
     #output_shape = (3, 64, 64)    # (velocity components, height, width)
-    output_shape = (1, 64, 64)    # (vz, height, width)
+    #input_shape = (1, 622, 12, 12)  # v6_1 (channels, wavelengths, height, width)
+    # input_shape = (1, 311, 12, 12) # v7
+    input_shape = (2, 622, 12, 12)
+    output_shape = (1, 12, 12)    # (vz, height, width)
     
     # taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
-    taus = ["1e-1", "1e-2", "1e-2", "1e-3", "1e-4"] 
-    stokes_profiles = ["V", "I", "V", "V", "V"]
-    dataset_path = '/dat/xenoss/thesis/data/v1/dataset/train/'
-
+    # taus = ["1e-1", "1e-2", "1e-2", "1e-3", "1e-4"] 
+    # stokes_profiles = ["V", "I", "V", "V", "V"]
+    
+    taus = ["1e-1"]
+    stokes_profiles = ["I"]
+    version = "v6_2"
+    dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset/train/'
     # for tau in taus:
     #     for stokes_profile in stokes_profiles:
     #         deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
@@ -478,5 +546,5 @@ if (__name__ == '__main__'):
     for i in range(len(taus)):
         tau = taus[i]
         stokes_profile = stokes_profiles[i]
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 64, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz_{version}/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
         deepvel_net.train(200)

@@ -81,6 +81,14 @@ def calculate_correlation (original, predicted):
     predicted = predicted.cpu().numpy()
 
     pearson_coeffs = []
+    print("Original shape:", original.shape)
+    print("Predicted shape:", predicted.shape)
+
+    # if predicted.shape[0] == 1: #infering only vz
+    #     if isinstance(original, np.ndarray):
+    #         original = torch.from_numpy(original)
+    #     original = original[2, :, :].unsqueeze(0)
+    #     original = original.cpu().numpy()
     n_channels = original.shape[0]
 
     for ch in range(n_channels):

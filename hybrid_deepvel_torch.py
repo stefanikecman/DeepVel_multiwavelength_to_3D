@@ -260,18 +260,18 @@ class DeepVel_net2(nn.Module):
 
         self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
+        self.pool_I_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.pool_res_I = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
         
         self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
         
-        self.pool_I_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-        self.pool_V_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-
-        self.pool_res_I = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        self.pool_V_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))        
         self.pool_res_V = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
 
-        self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
         self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
+        self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
+        
         self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
         
 
@@ -532,12 +532,13 @@ if (__name__ == '__main__'):
     main_root = "/dat/xenoss/"
 
     ######### NOTE training multiheight models ########
-    taus = ["1e-1"]
+    taus = ["1e-3"]
     dataset_path = '/dat/xenoss/thesis/data/v4/dataset/train/'
     input_shape = (2, 175, 16, 16)  # (channels, wavelengths, height, width)
     # output_shape = (3, 64, 64)    # (velocity components, height, width)
     output_shape = (1, 16, 16)    # (vz, height, width)
 
     for tau in taus:
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape,batch = 32, dataset_path = dataset_path, network_path = f"/scratch/xenoss/hybrid_vz_16x16_v4_DV2/tau_{tau}/checkpoints/")
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape,batch = 32, 
+                                  dataset_path = dataset_path, network_path = f"/scratch/xenoss/hybrid_vz_16x16_v4_DV2/tau_{tau}/checkpoints/")
         deepvel_net.train(50)
