@@ -4,15 +4,16 @@ import muram as muram
 import numpy as np
 import torch
 import matplotlib
-matplotlib.use('agg')
+
 import matplotlib.pyplot as plt
 import torch.nn as nn
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 import random
-import shutil
 import muram as mio
 import astropy.io.fits as fits
 import scipy.interpolate as sci
+
+matplotlib.use('agg')
 
 main_path = "/dat/milic/2D/"
 intensities_path = "/home/xenoss/data/kecman_project/DeepVel_3D_velocity/intensities/"
@@ -309,24 +310,24 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
     # input_indices2 = np.arange(150,4650,150)
     # input_data_i, input_data_v = [], []
     # for i in range(len(input_indices1)):
-    #     input1 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices1[i]}.fits'))[0].data
-    #     input2 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices2[i]}.fits'))[0].data
+        # input1 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices1[i]}.fits'))[0].data
+        # input2 = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{input_indices2[i]}.fits'))[0].data
 
-    #     stokes_I1 = input1[:, :, 0, :]
-    #     stokes_V1 = input1[:, :, 1, :]
-    #     stokes_I2 = input2[:, :, 0, :]
-    #     stokes_V2 = input2[:, :, 1, :]
+        # stokes_I1 = input1[:, :, 0, :]
+        # stokes_V1 = input1[:, :, 1, :]
+        # stokes_I2 = input2[:, :, 0, :]
+        # stokes_V2 = input2[:, :, 1, :]
 
-    #     I1_t = np.transpose(stokes_I1, (2, 0, 1))  
-    #     I2_t = np.transpose(stokes_I2, (2, 0, 1))  
-    #     input_I = np.stack([I1_t, I2_t], axis=0)
+        # I1_t = np.transpose(stokes_I1, (2, 0, 1))  
+        # I2_t = np.transpose(stokes_I2, (2, 0, 1))  
+        # input_I = np.stack([I1_t, I2_t], axis=0)
 
-    #     V1_t = np.transpose(stokes_V1, (2, 0, 1))
-    #     V2_t = np.transpose(stokes_V2, (2, 0, 1))
-    #     input_V = np.stack([V1_t, V2_t], axis=0)
+        # V1_t = np.transpose(stokes_V1, (2, 0, 1))
+        # V2_t = np.transpose(stokes_V2, (2, 0, 1))
+        # input_V = np.stack([V1_t, V2_t], axis=0)
 
-    #     np.save(os.path.join(save_path, 'inputs/stokes_I', f'stokesI_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_I))
-    #     np.save(os.path.join(save_path, 'inputs/stokes_V', f'stokesV_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_V))
+        # np.save(os.path.join(save_path, 'inputs/stokes_I', f'stokesI_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_I))
+        # np.save(os.path.join(save_path, 'inputs/stokes_V', f'stokesV_{input_indices1[i]}_{input_indices2[i]}'), np.array(input_V))
 
     #DOWNSAMPLE INPUT CUBES
     # pick n points and do log sampling with the n points on one side and symmetrical on the other. then round the logs up so i dont have to interpolate
@@ -349,12 +350,18 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
     # np.save(os.path.join(save_path, dataset_version, 'downsampled_grids', 'indices_downsampled.npy'), np.concatenate(new_index_grid))
     
     input_data_i, input_data_v = [], []
-    for i in range(0, 4650, 150):
-        input_data = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{i}.fits'))[0].data
+    intensities = []
+    # for i in range(0, 4650, 150):
+    #     #NOTE PROJECT CHECK VERSION:
+    #     I = muram.MuramIntensity(murampath, i)
+    #     intensities.append(I)
 
-        #sample logarithmically around the centers of the spectral lines
-        stokes_I = input_data[:, :, 0, :]
-        stokes_V = input_data[:, :, 1, :]
+        #NOTE THESIS VERSION:
+        # input_data = fits.open(os.path.join(snapi_path, f'tumag_stokesIV_cube_{i}.fits'))[0].data
+
+        # #sample logarithmically around the centers of the spectral lines
+        # stokes_I = input_data[:, :, 0, ::4]
+        # stokes_V = input_data[:, :, 1, ::4]
         # stokes_I_g, stokes_V_g = [], []
 
         # for g in new_index_grid:
@@ -369,26 +376,27 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
         ## np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_I', f'stokesI_{i}_downsampled'), I_t)
         ## np.save(os.path.join(save_path, 'inputs/downsampled_cubes/stokes_V', f'stokesV_{i}_downsampled'), V_t)
 
-        I_t = np.transpose(stokes_I, (2, 0, 1))  
-        V_t = np.transpose(stokes_V, (2, 0, 1)) 
+        # I_t = np.transpose(stokes_I, (2, 0, 1))  
+        # V_t = np.transpose(stokes_V, (2, 0, 1)) 
         
-        input_data_i.append(I_t)
-        input_data_v.append(V_t)
+        # input_data_i.append(I_t)
+        # input_data_v.append(V_t)
 
-    I_save = np.stack(input_data_i, axis=0)
-    V_save = np.stack(input_data_v, axis=0)
-    print(f"Input I shape after downsampling: {I_save.shape}")
-    print(f"Input V shape after downsampling: {V_save.shape}")
-    np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'), I_save)
-    np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'), V_save)
+    # I_save = np.stack(input_data_i, axis=0)
+    # V_save = np.stack(input_data_v, axis=0)
+    # print(f"Input I shape after downsampling: {I_save.shape}")
+    # print(f"Input V shape after downsampling: {V_save.shape}")
+    # np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'), I_save)
+    # np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'), V_save)
+    # np.save(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_intensities.npy'), np.stack(intensities, axis=0))
 
     # OUTPUTS
     print("Generating labels...")
     v1_iters = np.arange(50, 4550, 150)
     v2_iters = np.arange(100, 4600, 150) #normally
 
-    #for v5, v6_1, v7:
-    # v1_iters = np.arange(0, 4650, 150)
+    # #for v5, v6_1, v7, v8:
+    # # v1_iters = np.arange(0, 4650, 150)
 
     vel_data = []
     for i in range(len(v1_iters)):
@@ -398,26 +406,35 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
         muram_v1 = mio.MuramTauSlice(murampath, v1_idx, tau)
         muram_v2 = mio.MuramTauSlice(murampath, v2_idx, tau)
 
-        vx1 = muram_v1.vy[::2,::2]
-        vy1 = muram_v1.vz[::2,::2]
-        vz1 = muram_v1.vx[::2,::2]
+        #NOTE just to check the project version:
+        vx1 = muram_v1.vy
+        vy1 = muram_v1.vz
+        vz1 = muram_v1.vx
 
-        #normally:
-        vx2 = muram_v2.vy[::2,::2]
-        vy2 = muram_v2.vz[::2,::2]
-        vz2 = muram_v2.vx[::2,::2]
+        vx2 = muram_v2.vy
+        vy2 = muram_v2.vz
+        vz2 = muram_v2.vx
+
+        # vx1 = muram_v1.vy[::2,::2]
+        # vy1 = muram_v1.vz[::2,::2]
+        # vz1 = muram_v1.vx[::2,::2]
+
+    #     #normally:
+    #     vx2 = muram_v2.vy[::2,::2]
+    #     vy2 = muram_v2.vz[::2,::2]
+    #     vz2 = muram_v2.vx[::2,::2]
 
         vx = (vx1 + vx2) / 2.
         vy = (vy1 + vy2) / 2.
         vz = (vz1 + vz2) / 2.
 
-        # #for v5, v6_1, v7:
-        # vx = vx1
-        # vy = vy1
-        # vz = vz1
+    #     # #for v5, v6_1, v7, v8:
+    #     # vx = vx1
+    #     # vy = vy1
+    #     # vz = vz1
 
         v_out = np.stack([vx, vy, vz], axis=0)
-        #np.save(os.path.join(save_path, 'labels', f'vel_{v1_idx}_{v2_idx}.npy'), v_out)
+    #     #np.save(os.path.join(save_path, 'labels', f'vel_{v1_idx}_{v2_idx}.npy'), v_out)
         vel_data.append(v_out)
     vel_data = np.stack(vel_data, axis=0)
     print(f"Velocity data shape: {vel_data.shape}")
@@ -425,19 +442,27 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
 
     #NORMALIZE DATA AND SAVE STATS
     print("Normalizing data...")
-    input_data_i = np.load(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'))
-    input_data_v = np.load(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'))
+    #NOTE PROJECT CHECK VERSION
+    intensities_data = np.load(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_intensities.npy'))
+    mean_intensities = np.mean(intensities_data)
+    std_intensities = np.std(intensities_data)
+    norm_intensities = (intensities_data - mean_intensities) / std_intensities
+    np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_intensities_normalized.npy'), norm_intensities)
+
+    #NOTE THESIS VERSION
+    # input_data_i = np.load(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_i_light_log.npy'))
+    # input_data_v = np.load(os.path.join(save_path, dataset_version, 'stacked/denorm/stacked_inputs_v_light_log.npy'))
     vel_data = np.load(os.path.join(save_path, dataset_version, f'stacked/denorm/stacked_velocities_{tau}.npy'))
 
-    mean_i = np.mean(input_data_i)
-    std_i = np.std(input_data_i)
-    norm_input_i = (input_data_i - mean_i) / std_i
-    np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_inputs_i_light_log_normalized.npy'), norm_input_i)
+    # mean_i = np.mean(input_data_i)
+    # std_i = np.std(input_data_i)
+    # norm_input_i = (input_data_i - mean_i) / std_i
+    # np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_inputs_i_light_log_normalized.npy'), norm_input_i)
 
-    mean_v = np.mean(input_data_v)
-    std_v = np.std(input_data_v)
-    norm_input_v = (input_data_v - mean_v) / std_v
-    np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_inputs_v_light_log_normalized.npy'), norm_input_v)
+    # mean_v = np.mean(input_data_v)
+    # std_v = np.std(input_data_v)
+    # norm_input_v = (input_data_v - mean_v) / std_v
+    # np.save(os.path.join(save_path, dataset_version, 'stacked/norm/stacked_inputs_v_light_log_normalized.npy'), norm_input_v)
 
     mean_vel = np.mean(vel_data)
     std_vel = np.std(vel_data)
@@ -445,21 +470,20 @@ def create_dummy_datacubes(tau, save_path, dataset_version,murampath = '/dat/mil
     np.save(os.path.join(save_path, dataset_version, f'stacked/norm/stacked_velocities_{tau}_normalized.npy'), norm_vel)
 
     with open(f'important_stats/normalization_stats_{dataset_version}.txt', 'a') as f:
-        f.write(f"Input Stokes I mean (full wavelength): {mean_i}, std: {std_i}\n")
-        f.write(f"Input Stokes V mean (every full wavelength): {mean_v}, std: {std_v}\n")
+        # f.write(f"Input Stokes I mean (full wavelength): {mean_i}, std: {std_i}\n")
+        # f.write(f"Input Stokes V mean (every full wavelength): {mean_v}, std: {std_v}\n")
         f.write(f"Velocities mean tau = {tau}: {mean_vel}, std: {std_vel}\n")
+        f.write(f"Intensities mean: {mean_intensities}, std: {std_intensities}\n")
 
 def create_downsampled_data(num_samples_per_channel, num_spatial_samples, dataset_version, main_path = "/home/xenoss/dat/thesis/data/"):
     cube_path = os.path.join(main_path, dataset_version, "stacked/norm/")
-    save_path = os.path.join(main_path, dataset_version, "dataset/train/")
+    save_path = os.path.join(main_path, dataset_version, "dataset_128x128/train/")
+
     # sample random coordinates
     data_ch = 2
-    #data_h_w = 64
-    # data_h_w = 16
-    #data_ch = 1 #for v5, v6_1, v7
-    data_h_w = 12
+    data_h_w = 128
 
-    max_ch = int(31 - data_ch//2)
+    max_ch = int(31 - 2 - data_ch//2) #-2 to avoid having test data in the training set
     max_h_w = 768 - data_h_w//2
     min_ch = data_ch//2
     min_h_w = data_h_w//2
@@ -467,25 +491,32 @@ def create_downsampled_data(num_samples_per_channel, num_spatial_samples, datase
     center_h = random.sample(range(min_h_w, max_h_w), num_spatial_samples)
     center_w = random.sample(range(min_h_w, max_h_w), num_spatial_samples)
     center_c = random.sample(range(min_ch, max_ch), num_samples_per_channel)
+    
+    #NOTE for dataset v8
+    # center_c = [21, 15, 12, 4, 17, 24, 29, 20, 22, 1, 28, 23, 0, 5, 8, 7, 10, 27, 11, 26]
+    # center_h = [500, 733, 499, 218, 97, 686, 618, 279, 602, 648, 423, 722, 401, 190, 196, 270, 600, 75, 652, 288, 343, 644, 110, 144, 539, 103, 42, 176, 725, 54, 171, 371, 162, 72, 659, 430, 88, 188, 472, 229, 540, 335, 126, 125, 345, 603, 592, 422, 6, 720, 421, 744, 328, 666, 156, 613]
+    # center_w = [78, 542, 642, 516, 634, 191, 660, 368, 308, 539, 678, 268, 666, 17, 640, 674, 386, 412, 652, 118, 562, 752, 647, 439, 160, 524, 102, 619, 149, 464, 31, 366, 276, 699, 199, 61, 263, 419, 71, 709, 558, 79, 81, 327, 381, 538, 262, 360, 25, 572, 582, 351, 591, 663, 347, 715]
 
-    #save the rand coordinates for future reference
-    with open(f'important_stats/random_centers_{dataset_version}.txt', 'w') as f:
+    #NOTE for dataset v8_3
+    # center_c=[4, 15, 23, 12, 9, 2, 20, 16, 10, 27, 24, 13, 11, 21, 17, 14, 6, 3, 22, 8]
+    # center_h=[150, 215, 398, 423, 288, 173, 64, 111, 421, 194, 322, 133, 377, 479, 454, 67, 57, 336, 391, 267, 648, 559, 714, 534, 40, 675, 693, 308, 734, 588, 365, 178, 81, 232, 467, 381, 361, 116, 516, 202, 342, 176, 213, 691, 159, 557, 495, 298, 268, 535, 90, 370, 219, 79, 480, 315]
+    # center_w=[681, 103, 603, 42, 441, 92, 281, 498, 405, 630, 492, 537, 635, 208, 292, 480, 206, 125, 303, 704, 53, 512, 729, 424, 556, 344, 129, 378, 644, 218, 606, 404, 461, 613, 443, 593, 126, 496, 110, 576, 717, 307, 685, 49, 611, 622, 243, 655, 472, 506, 245, 347, 732, 231, 586, 624]
+
+    # save the rand coordinates for future reference
+    with open(f'important_stats/random_centers_{dataset_version}_128x128.txt', 'w') as f:
         f.write("center_c: " + ", ".join(map(str, center_c)) + "\n")
         f.write("center_h: " + ", ".join(map(str, center_h)) + "\n")
         f.write("center_w: " + ", ".join(map(str, center_w)) + "\n")
 
-    stokes_I = np.load(os.path.join(cube_path, 'stacked_inputs_i_light_log_normalized.npy'))
-    stokes_V = np.load(os.path.join(cube_path, 'stacked_inputs_v_light_log_normalized.npy'))
-    #velocities = np.load(os.path.join(cube_path, 'stacked_velocities_normalized.npy'))
-    # vel_1 = np.load(os.path.join(cube_path, 'stacked_velocities_1_normalized.npy'))
-    vel_1e_1 = np.load(os.path.join(cube_path, 'stacked_velocities_0.1_normalized.npy'))
+    # stokes_I = np.load(os.path.join(cube_path, 'stacked_inputs_i_light_log_normalized.npy'))
+    # stokes_V = np.load(os.path.join(cube_path, 'stacked_inputs_v_light_log_normalized.npy'))
+    vel_1 = np.load(os.path.join(cube_path, 'stacked_velocities_1_normalized.npy'))
+    # vel_1e_1 = np.load(os.path.join(cube_path, 'stacked_velocities_0.1_normalized.npy'))
     # vel_1e_2 = np.load(os.path.join(cube_path, 'stacked_velocities_0.01_normalized.npy'))
     # vel_1e_3 = np.load(os.path.join(cube_path, 'stacked_velocities_0.001_normalized.npy'))
     # vel_1e_4 = np.load(os.path.join(cube_path, 'stacked_velocities_0.0001_normalized.npy'))
 
-    # center_c = [8, 10, 23, 28, 15, 18, 27, 5, 7, 20, 22, 14, 29, 21, 12, 2, 13, 26, 11, 3, 19, 4]
-    # center_h = [172, 454, 135, 654, 156, 96, 682, 142, 295, 387, 160, 473, 76, 87, 557, 685, 430, 90, 604, 639, 699, 355]
-    # center_w = [525, 681, 687, 519, 698, 408, 228, 261, 655, 223, 468, 220, 680, 92, 669, 538, 134, 601, 204, 635, 474, 152]
+    intensities = np.load(os.path.join(cube_path, 'stacked_intensities_normalized.npy'))
     
     half_s = data_h_w // 2
     half_c = data_ch // 2
@@ -498,60 +529,64 @@ def create_downsampled_data(num_samples_per_channel, num_spatial_samples, datase
                 cw = center_w[j]
                 cc = center_c[k]
 
-                stokesI = stokes_I[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
-                stokesV = stokes_V[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s] #normally
-                # #velocity = velocities[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s] 
+                intensity = intensities[cc-half_c:cc+half_c, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                np.save(save_path + f'inputs/intensities/intensities_{cc}_{ch}_{cw}.npy', intensity)
 
-                #for v5, v6_1, v7:
+                # stokesI = stokes_I[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                # stokesV = stokes_V[cc-half_c:cc+half_c, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s] #normally
+
+                #for v5, v6_1, v7, v8:
                 # stokesI = stokes_I[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
                 # stokesV = stokes_V[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
                 
-                # vel1 = vel_1[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
-                vel1e_1 = vel_1e_1[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                vel1 = vel_1[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
+                # vel1e_1 = vel_1e_1[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
                 # vel1e_2 = vel_1e_2[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
                 # vel1e_3 = vel_1e_3[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
                 # vel1e_4 = vel_1e_4[cc, :, ch - half_s: ch + half_s, cw - half_s: cw + half_s]
 
-                np.save(save_path + f'inputs/stokes_I/stokes_I_{cc}_{ch}_{cw}.npy', stokesI)
-                np.save(save_path + f'inputs/stokes_V/stokes_V_{cc}_{ch}_{cw}.npy', stokesV)
-                # np.save(save_path + f'labels/tau_1.0/velocities_{cc}_{ch}_{cw}.npy', vel1)
-                np.save(save_path + f'labels/tau_1e-1/velocities_{cc}_{ch}_{cw}.npy', vel1e_1)
+                # np.save(save_path + f'inputs/stokes_I/stokes_I_{cc}_{ch}_{cw}.npy', stokesI)
+                # np.save(save_path + f'inputs/stokes_V/stokes_V_{cc}_{ch}_{cw}.npy', stokesV)
+                np.save(save_path + f'labels/tau_1.0/velocities_{cc}_{ch}_{cw}.npy', vel1)
+                # np.save(save_path + f'labels/tau_1e-1/velocities_{cc}_{ch}_{cw}.npy', vel1e_1)
                 # np.save(save_path + f'labels/tau_1e-2/velocities_{cc}_{ch}_{cw}.npy', vel1e_2)
                 # np.save(save_path + f'labels/tau_1e-3/velocities_{cc}_{ch}_{cw}.npy', vel1e_3)
                 # np.save(save_path + f'labels/tau_1e-4/velocities_{cc}_{ch}_{cw}.npy', vel1e_4)
-                #np.save(save_path + f'labels/velocities_{cc}_{ch}_{cw}.npy', velocity)
 
 def create_last_2_layers_test_data (dataset_version, main_path = "/home/xenoss/dat/thesis/data/"):
     cube_norm_path = os.path.join(main_path, dataset_version, "stacked/norm/")
     save_path = os.path.join(main_path, dataset_version, "dataset/test/last_2_layers/")
-    stokes_I = np.load(os.path.join(cube_norm_path, 'stacked_inputs_i_light_log_normalized.npy'))
-    stokes_V = np.load(os.path.join(cube_norm_path, 'stacked_inputs_v_light_log_normalized.npy'))
+    intensities = np.load(os.path.join(cube_norm_path, 'stacked_intensities_normalized.npy'))
+    # stokes_I = np.load(os.path.join(cube_norm_path, 'stacked_inputs_i_light_log_normalized.npy'))
+    # stokes_V = np.load(os.path.join(cube_norm_path, 'stacked_inputs_v_light_log_normalized.npy'))
     
-    # vel_1 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_1_normalized.npy'))
-    vel_1e_1 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_0.1_normalized.npy'))
+    vel_1 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_1_normalized.npy'))
+    # vel_1e_1 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_0.1_normalized.npy'))
     # vel_1e_2 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_0.01_normalized.npy'))
     # vel_1e_3 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_0.001_normalized.npy'))
     # vel_1e_4 = np.load(os.path.join(cube_norm_path, 'stacked_velocities_0.0001_normalized.npy'))
 
-    stokes_I_last2 = stokes_I[-2:, :, :, :]
-    stokes_V_last2 = stokes_V[-2:, :, :, :]
-    # vel_1_last2 = vel_1[-1:, :, :, :]
-    vel_1e_1_last2 = vel_1e_1[-1:, :, :, :]
+    intensities_last_2 = intensities[-2:, :, :]
+    # stokes_I_last2 = stokes_I[-2:, 0, :, :]
+    # stokes_V_last2 = stokes_V[-2:, 0, :, :]
+    vel_1_last2 = vel_1[-1:, :2, :, :]
+    # vel_1e_1_last2 = vel_1e_1[-1:, :, :, :]
     # vel_1e_2_last2 = vel_1e_2[-1:, :, :, :]
     # vel_1e_3_last2 = vel_1e_3[-1:, :, :, :]
     # vel_1e_4_last2 = vel_1e_4[-1:, :, :, :]
 
-    #NOTE only v5, v7, v6_1 version
+    #NOTE only v5, v7, v6_1, v8 version
     # stokes_I_last2 = stokes_I[-1, :, :, :]
     # stokes_V_last2 = stokes_V[-1, :, :, :]
 
-    np.save(os.path.join(save_path, 'inputs/stokes_I/stokes_I_1.npy'), stokes_I_last2)
-    np.save(os.path.join(save_path, 'inputs/stokes_V/stokes_V_1.npy'), stokes_V_last2)
-    # np.save(os.path.join(save_path, 'labels/tau_1.0/velocities_last2_layers.npy'), vel_1_last2)
-    np.save(os.path.join(save_path, 'labels/tau_1e-1/velocities_tau_1e-1.npy'), vel_1e_1_last2)
-    # np.save(os.path.join(save_path, 'labels/tau_1e-2/velocities_last2_layers.npy'), vel_1e_2_last2)
-    # np.save(os.path.join(save_path, 'labels/tau_1e-3/velocities_last2_layers.npy'), vel_1e_3_last2)
-    # np.save(os.path.join(save_path, 'labels/tau_1e-4/velocities_last2_layers.npy'), vel_1e_4_last2)
+    np.save(os.path.join(save_path, 'inputs/intensities/intensities_1.npy'), intensities_last_2)
+    # np.save(os.path.join(save_path, 'inputs/stokes_I/stokes_I_1.npy'), stokes_I_last2)
+    # np.save(os.path.join(save_path, 'inputs/stokes_V/stokes_V_1.npy'), stokes_V_last2)
+    np.save(os.path.join(save_path, 'labels/tau_1.0/velocities_tau_1.0.npy'), vel_1_last2)
+    # np.save(os.path.join(save_path, 'labels/tau_1e-1/velocities_tau_1e-1.npy'), vel_1e_1_last2)
+    # np.save(os.path.join(save_path, 'labels/tau_1e-2/velocities_tau_1e-2.npy'), vel_1e_2_last2)
+    # np.save(os.path.join(save_path, 'labels/tau_1e-3/velocities_tau_1e-3.npy'), vel_1e_3_last2)
+    # np.save(os.path.join(save_path, 'labels/tau_1e-4/velocities_tau_1e-4.npy'), vel_1e_4_last2)
 
 def crop_center_4_patches(original_dir, input_data_name, new_dim, save_dir):
     '''
@@ -619,6 +654,40 @@ def create_dataset_v2(v1_path = "/dat/xenoss/thesis/data/v1/dataset/train", save
         for v in velocities_specific_tau:
             crop_center_4_patches(velocities_specific_tau_path, v, 16, os.path.join(save_path, 'labels/', t))
 
+def make_dataset_compatible_with_project_version (dataset_version, main_path = "/home/xenoss/dat/thesis/data/"):
+
+    dataset_path = os.path.join(main_path, dataset_version, "dataset/train/")
+    save_path = os.path.join(main_path, dataset_version+"_transformed", "dataset/train/")
+
+    stokes_I_path = os.path.join(dataset_path, 'inputs/stokes_I/')
+    stokes_V_path = os.path.join(dataset_path, 'inputs/stokes_V/')
+    velocities_path = os.path.join(dataset_path, 'labels/')
+
+    taus = ["1.0"]
+
+    # stokes_I_files = os.listdir(stokes_I_path)
+    # stokes_V_files = os.listdir(stokes_V_path)
+
+    # print("Transforming Stokes I files...")
+    # for si in stokes_I_files:
+    #     I = np.load(os.path.join(stokes_I_path, si))[:,0,:,:]
+    #     np.save(os.path.join(save_path, 'inputs/stokes_I/',si), I)
+
+    # print("Transforming Stokes V files...")
+    # for sv in stokes_V_files:
+    #     V = np.load(os.path.join(stokes_V_path, sv))[:,0,:,:]
+    #     np.save(os.path.join(save_path, 'inputs/stokes_V/', sv), V)
+
+    print("Transforming velocities files...")
+    for t in taus:
+        print("Processing tau: ", t)
+        velocities_tau_path = os.path.join(velocities_path, f"tau_{t}")
+        velocities_tau_files = os.listdir(velocities_tau_path)
+
+        for v in velocities_tau_files:
+            vel = np.load(os.path.join(velocities_tau_path, v))[:2,:,:]
+            np.save(os.path.join(save_path, 'labels/', f"tau_{t}/", v), vel)
+            
 if (__name__ == '__main__'):
     
     main_root = "/dat/xenoss/"
@@ -634,17 +703,16 @@ if (__name__ == '__main__'):
     #print(len(data))
     #print(np.load(os.path.join(main_root, "thesis/data/v2/dataset/train/inputs/stokes_V/", data[0])).shape)
 
-    #FOR DATASET VERSION V3:
-    #create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v3")
-    #create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v3")
-
     #FOR DATASET VERSION V4:
-    #create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v4")
+    # create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v4")
     #create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v4")
     # create_last_2_layers_test_data(dataset_version="v3")
     # create_last_2_layers_test_data(dataset_version="v4")
 
-    #FOR DATASET VERSION V5:
-    create_dummy_datacubes(tau=1e-1, save_path=main_root + "thesis/data/", dataset_version="v6_2")
-    create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v6_2")
-    create_last_2_layers_test_data(dataset_version="v6_2")
+    tau = [1]
+    # for t in tau:
+    #     create_dummy_datacubes(tau=t, save_path=main_root + "thesis/data/", dataset_version="v8_3_from_full_cubes")
+    create_downsampled_data(num_samples_per_channel=20, num_spatial_samples=56, dataset_version="v8_3_from_full_cubes")
+    # create_last_2_layers_test_data(dataset_version="v8_3_from_full_cubes")
+
+    # make_dataset_compatible_with_project_version(dataset_version="v8_3")

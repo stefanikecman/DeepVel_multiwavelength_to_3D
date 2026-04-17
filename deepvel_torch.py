@@ -12,6 +12,9 @@ from collections import OrderedDict
 from datetime import datetime
 import time
 
+# torch.set_num_threads(1)
+# torch.set_num_interop_threads(1)
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -25,9 +28,11 @@ class dataset_deepVel(Dataset):
 
         self.stokes_profile = stokes_profile
         self.out_channels = out_channels
-        self.intensities_dir = os.path.join(dataset_path, f"inputs/stokes_{self.stokes_profile}")
+        # self.intensities_dir = os.path.join(dataset_path, f"inputs/stokes_{self.stokes_profile}")
+        self.intensities_dir = os.path.join(dataset_path, f"inputs/intensities") #NOTE patch for project check experiment, normally should be stokes_I or stokes_V
         print("Loading velocities from tau: ", tau)
         self.velocities_dir = os.path.join(dataset_path, "labels/tau_" + tau)
+        print("Intensities dir: ", self.intensities_dir)
 
         intensities = os.listdir(self.intensities_dir)
         velocities = os.listdir(self.velocities_dir)
@@ -35,22 +40,36 @@ class dataset_deepVel(Dataset):
         intensities.sort()
         velocities.sort()
 
-        if test == False:
-            for i in range(len(intensities)):
-                intensity_index = intensities[i].replace(f'stokes_{self.stokes_profile}_', '')
-                velocity_index = velocities[i].replace('velocities_', '')
+        # intensities = intensities[:256]
+        # velocities = velocities[:256]
 
-                if velocity_index != intensity_index:
-                    raise ValueError("Input (I) - label data not corresponding: ", intensities[i] + " "+ velocities[i])
-                
-            self.intensities = [torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32)) for f in intensities] #NOTE unsqueeze for v5 only, patch
-            self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
+        #NOTE new way of loading data:
+        # if test == False:
+        #     for i in range(len(intensities)):
+        #         intensity_index = intensities[i].replace(f'stokes_{self.stokes_profile}_', '')
+        #         velocity_index = velocities[i].replace('velocities_', '')
+
+        #         if velocity_index != intensity_index:
+        #             raise ValueError("Input (I) - label data not corresponding: ", intensities[i] + " "+ velocities[i])
             
-            if self.out_channels == 1:
-                self.velocities = [vel[2,:,:].unsqueeze(0) for vel in self.velocities]
+        #     self.intensities = []
+        #     for f in intensities: # NOTE tmp check if the architecture is wrong or the data
+        #         i = torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32))[:,0,:,:]
+                
+        #         # if i.dim() == 3: #should be this normally for conv3d
+        #         #     i = i.unsqueeze(0)
+        #         self.intensities.append(i)
+        #     # self.intensities = [torch.from_numpy(np.load(os.path.join(self.intensities_dir, f)).astype(np.float32)) for f in intensities]
+        #     self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
+            
+        #     if self.out_channels == 1:
+        #         self.velocities = [vel[2,:,:].unsqueeze(0) for vel in self.velocities]
+        #     if self.out_channels == 2:
+        #         self.velocities = [vel[:2,:,:] for vel in self.velocities]                    
 
-        # self.intensities = intensities
-        # self.velocities = velocities
+        #NOTE old way of loading data:
+        self.intensities = intensities
+        self.velocities = velocities
 
         self.n_train_datapoints = len(intensities)
         
@@ -74,11 +93,12 @@ class dataset_deepVel(Dataset):
         Raises:
             ValueError: If the input and label data do not correspond
         """
+        #TODO fix this logic
         if test == True:
             idx = self.validation_idx[idx]
 
-        # intensity_index = self.intensities[idx].replace('intensity_', '')
-        intensity_index = self.intensities[idx].replace(f'stokes_{self.stokes_profile}_', '')
+        intensity_index = self.intensities[idx].replace('intensities_', '') #NOTE patch for project check experiment, normally should be stokes_I or stokes_V
+        # intensity_index = self.intensities[idx].replace(f'stokes_{self.stokes_profile}_', '')
         velocity_index = self.velocities[idx].replace('velocities_', '')
 
         if velocity_index != intensity_index:
@@ -94,24 +114,31 @@ class dataset_deepVel(Dataset):
         Raises:
             ValueError: If the input and label data do not correspond
         """
-
+        #TODO fix this logic
         if self.test:
             idx = self.validation_idx[idx]
 
-        # I = np.load(os.path.join(self.intensities_dir, self.intensities[idx]))
-        # I = torch.from_numpy(I.astype(np.float32))  
+        #NOTE Old way of loading data:
+        I = torch.from_numpy(np.load(os.path.join(self.intensities_dir, self.intensities[idx])).astype(np.float32))
+        vel = torch.from_numpy(np.load(os.path.join(self.velocities_dir, self.velocities[idx])).astype(np.float32))[:2,:,:]
+        # I = torch.from_numpy(np.load(os.path.join(self.intensities_dir, self.intensities[idx])).astype(np.float32))[:,0,:,:]
 
         # if self.out_channels == 1:
         #     vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))[2,:,:]
         #     vel = torch.from_numpy(vel.astype(np.float32)).unsqueeze(0)
+        
+        # elif self.out_channels == 2:
+        #     vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))[:2,:,:]
+
         # else:
         #     vel = np.load(os.path.join(self.velocities_dir, self.velocities[idx]))
         #     vel = torch.from_numpy(vel.astype(np.float32))
 
-        # self.check_indices(idx, self.test)
-
-        I = self.intensities[idx]
-        vel = self.velocities[idx]
+        self.check_indices(idx, self.test)
+        
+        #NOTE New way of loading data:
+        # I = self.intensities[idx]
+        # vel = self.velocities[idx]
 
         return I, vel
     
@@ -160,8 +187,8 @@ class DeepVel_net(nn.Module):
 
         self.residual = self.make_Reslayer(self.n_filters, self.blocks)
         self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm3d(self.n_filters))
-        self.adapt_pool = nn.AdaptiveAvgPool3d((1, None, None))
         self.conv3 = nn.Conv3d(self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
+        self.adapt_pool = nn.AdaptiveAvgPool3d((1, None, None)) 
 
     def make_Reslayer(self, out_channels, num_blocks, stride=1):
             """
@@ -274,10 +301,12 @@ class DeepVel_net3(nn.Module):
         self.out_channels = out_channels
         self.blocks = blocks
         
-        self.conv1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)), nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        self.conv1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)), 
+                                             nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
         self.pool1 = nn.MaxPool3d(kernel_size=(15, 1, 1), stride=(15, 1, 1))
         self.residual = self.make_Reslayer(self.n_filters, self.blocks)
-        self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), nn.BatchNorm3d(self.n_filters))
+        self.conv2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
+                                             nn.BatchNorm3d(self.n_filters))
         self.pool2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
         self.pool_res = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
         self.conv3 = nn.Conv3d(self.n_filters, self.out_channels, kernel_size = (1, 1, 1), stride=1, padding=0)
@@ -318,6 +347,81 @@ class DeepVel_net3(nn.Module):
         out = out.squeeze(2)
         return out
 
+class ResidualBlock_old(nn.Module):
+    """
+    Class for the residual block with two convolutional layers.
+    """
+    def __init__(self, in_channels, out_channels, stride = 1):
+        super(ResidualBlock_old, self).__init__()
+        self.conv1 = nn.Sequential(
+                        nn.Conv2d(in_channels, out_channels, kernel_size = 3, stride = stride, padding = 1),
+                        nn.BatchNorm2d(out_channels),
+                        nn.ReLU()
+                        )
+        self.conv2 = nn.Sequential(
+                        nn.Conv2d(out_channels, out_channels, kernel_size = 3, stride = 1, padding = 1),
+                        nn.BatchNorm2d(out_channels))
+        self.out_channels = out_channels
+        
+    def forward(self, x):
+        residual = x
+        out = self.conv1(x)
+        out = self.conv2(out)
+        out += residual
+        return out
+    
+class DeepVel_net_old(nn.Module):
+    """
+    Model definition 
+    """
+    def __init__(self, in_channels=6, out_channels=2, n_filters=32, blocks=20): 
+        super(DeepVel_net_old, self).__init__()
+
+        self.n_filters = n_filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.blocks = blocks
+
+        self.conv1 = nn.Sequential(nn.Conv2d(self.in_channels, self.n_filters, kernel_size = 3, stride=1, padding=1),
+                                       nn.BatchNorm2d(self.n_filters),
+                                       nn.ReLU()
+                                       )
+        
+        self.residual = self.make_Reslayer(self.n_filters, self.blocks)
+
+        self.conv2 = nn.Sequential(nn.Conv2d(self.n_filters, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm2d(self.n_filters))
+        self.conv3 = nn.Conv2d(self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
+
+    def make_Reslayer(self, out_channels, num_blocks, stride=1):
+            """
+            Create a sequence of residual blocks.
+            Args:
+                out_channels: Number of output channels for each block
+                num_blocks: Number of residual blocks to create
+                stride: Stride for the first block (default is 1)
+            Returns:
+                A sequential container of residual blocks
+            """
+            strides = [stride] + [1]*(num_blocks-1)
+            layers = []
+            for stride in strides:
+                layers.append(ResidualBlock_old(self.n_filters, out_channels, stride))
+                self.n_filters = out_channels
+            return nn.Sequential(*layers)
+
+    def forward(self, x):
+        """
+        Forward pass through the network.
+        """
+        out = self.conv1(x)
+        res = out
+        out = self.residual(out)
+        out = self.conv2(out)
+        out += res
+        out = self.conv3(out)
+        return out
+
+
 class DeepVel_run(object):
     """
     Class for running the DeepVel model.
@@ -334,7 +438,7 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.stokes_profile = stokes_profile
 
-        self.model = DeepVel_net3(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
+        self.model = DeepVel_net_old(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
 
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
@@ -349,7 +453,7 @@ class DeepVel_run(object):
             self.trainset, self.testset = random_split(self.dataset, [self.train_len, self.test_len])
             self.trainloader = DataLoader(self.trainset, batch_size=self.batch_size, shuffle = True, num_workers = 0)
             self.testloader = DataLoader(self.testset, batch_size=self.batch_size, shuffle = False, num_workers = 0)
-            self.summary = summary(self.model, input_data = (torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width)), device=device)
+            # self.summary = summary(self.model, input_data = (torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width)), device=device)
         self.criterion = nn.MSELoss()
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)    
 
@@ -369,9 +473,9 @@ class DeepVel_run(object):
 
         scheduler = optim.lr_scheduler.ExponentialLR(self.optimizer, gamma = 0.96)
 
-        with open(os.path.join(self.network_path.replace("checkpoints/", ""), "architecture.txt"), "w") as f:
-            print("Writing architecture to file...", os.path.join(self.network_path.replace("checkpoints/", ""), "architecture.txt"))
-            f.write(str(self.summary))
+        # with open(os.path.join(self.network_path.replace("checkpoints/", ""), "architecture.txt"), "w") as f:
+        #     print("Writing architecture to file...", os.path.join(self.network_path.replace("checkpoints/", ""), "architecture.txt"))
+        #     f.write(str(self.summary))
 
         for epoch in range(epochs):
             self.model.train()
@@ -499,10 +603,10 @@ class DeepVel_run(object):
             x = torch.from_numpy(x.astype(np.float32))
         
         if x.dim() == 3:
-            x = x.unsqueeze(0).unsqueeze(0)
+            x = x.unsqueeze(0)#.unsqueeze(0) #patch for the project version
 
-        elif x.dim() == 4:
-            x = x.unsqueeze(0)
+        # elif x.dim() == 4:
+        #     x = x.unsqueeze(0)
 
         #x = normalize_layerwise(x)
         start = time.time()
@@ -527,24 +631,22 @@ if (__name__ == '__main__'):
     #output_shape = (3, 64, 64)    # (velocity components, height, width)
     #input_shape = (1, 622, 12, 12)  # v6_1 (channels, wavelengths, height, width)
     # input_shape = (1, 311, 12, 12) # v7
-    input_shape = (2, 622, 12, 12)
-    output_shape = (1, 12, 12)    # (vz, height, width)
+    # input_shape = (2, 622, 12, 12) #v6_2
+    input_shape = (2, 156, 128,128) #v8
+    output_shape = (2, 128, 128)    # (vz, height, width)
     
     # taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
     # taus = ["1e-1", "1e-2", "1e-2", "1e-3", "1e-4"] 
     # stokes_profiles = ["V", "I", "V", "V", "V"]
     
-    taus = ["1e-1"]
+    taus = ["1.0"]
     stokes_profiles = ["I"]
-    version = "v6_2"
-    dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset/train/'
-    # for tau in taus:
-    #     for stokes_profile in stokes_profiles:
-    #         deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape, batch = 8, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
-    #         deepvel_net.train(200)  
+    version = "v8_3_from_full_cubes"
+    dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset_128x128/train/'
 
     for i in range(len(taus)):
         tau = taus[i]
         stokes_profile = stokes_profiles[i]
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 64, dataset_path = dataset_path, network_path = f"/scratch/xenoss/stokes_{stokes_profile.lower()}_vz_{version}/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
-        deepvel_net.train(200)
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 256, dataset_path = dataset_path, 
+                                  network_path = f"/scratch/xenoss/intensity_{version}_128x128/tau_{tau}/checkpoints/", stokes_profile=stokes_profile)
+        deepvel_net.train(100)

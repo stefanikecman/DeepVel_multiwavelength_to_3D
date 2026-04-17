@@ -12,7 +12,7 @@ from metrics_and_plotting import ModelType, plot_prediction_and_scatter_full_map
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 main_root = "/home/xenoss/dat/thesis/"
-dataset_path = '/home/xenoss/dat/thesis/data/v1/dataset/train/'
+
 
 metrics_by_tau = OrderedDict()
 
@@ -45,30 +45,37 @@ metrics_by_tau = OrderedDict()
 
 #new tests from here:
 
-checkpoints_I = ["/home/xenoss/dat/thesis/models/v6_2/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_198_0.03582.pt"]
+# checkpoints_I = ["/home/xenoss/dat/thesis/models/v8/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_195_0.01720.pt"]
+# checkpoints_I = ["/home/xenoss/dat/thesis/models/v6_1/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_184_0.01495.pt"]
+# checkpoints_I = ["/home/xenoss/dat/thesis/models/v7/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_199_0.01575.pt"]
+# checkpoints_I = ["/home/xenoss/dat/thesis/models/v8/tau_1e-2/stokes_i_vz/checkpoints/DeepVel_torch_epoch_198_0.03873.pt",
+#                  "/home/xenoss/dat/thesis/models/v8/tau_1e-3/stokes_i_vz/checkpoints/DeepVel_torch_epoch_192_0.09494.pt",
+#                  "/home/xenoss/dat/thesis/models/v8/tau_1e-4/stokes_i_vz/checkpoints/DeepVel_torch_epoch_197_0.11808.pt"]
+
+# checkpoints_I = ["/home/xenoss/dat/thesis/models/v8_3/tau_1.0/stokes_i/checkpoints/DeepVel_torch_epoch_99_0.29016.pt"]
+checkpoints_I = ["//home/xenoss/dat/thesis/models/v8_3/tau_1.0/intensity_v8_3_from_full_cubes_128x128/checkpoints/DeepVel_torch_epoch_99_0.26665.pt"]
 checkpoints = checkpoints_I
-# taus = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
-taus = ["1e-1"]
-model_names = ["Stokes_I"]
-# model_names = ["Stokes_V"]
-version = "v6_2"
-test_path = f'/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/'
+taus = ["1.0"]
+model_names = ["DeepVel_I"]
+version = "v8_3"
+dataset_path = f'/home/xenoss/dat/thesis/data/{version}_from_full_cubes/dataset_128x128/train/'
+test_path = f'/home/xenoss/dat/thesis/data/{version}_from_full_cubes/dataset_128x128/test/last_2_layers/'
 model_paths = ["/home/xenoss/dat/thesis/models/"]
-model_types = [ModelType.STOKES_I]#, ModelType.STOKES_V, ModelType.STOKES_V, ModelType.STOKES_V, ModelType.STOKES_V]
-# input_shape = (2, 43, 64, 64)
-input_shape = (2, 622, 12, 12)
-output_shape = (1, 12, 12)
+model_types = [ModelType.DEEPVEL_I]
+input_shape = (2, 156, 128, 128)
+output_shape = (2, 128, 128)
 stokes_profile = "I"
-# stokes_profile = "V"
-# csvs = ["stokes_I_last2_tau_1.0", "stokes_I_last2_tau_1e-1", "stokes_I_last2_tau_1e-2", "stokes_I_last2_tau_1e-3", "stokes_I_last2_tau_1e-4"]
-# csvs = ["stokes_V_last2_tau_1.0", "stokes_V_last2_tau_1e-1", "stokes_V_last2_tau_1e-2", "stokes_V_last2_tau_1e-3", "stokes_V_last2_tau_1e-4"]
-csvs = [f"stokes_I_vz_{version}_last2_tau_1e-1"]
+csvs = [f"project_intensity_{version}_from_full_cubes_128x128_last2_tau_{taus[i]}" for i in range(len(taus))]
 common_csv = []
 for i, ckpt in enumerate(checkpoints):
 
-    deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape = output_shape, batch = 1, dataset_path = dataset_path, 
-                              network_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/stokes_{stokes_profile.lower()}_model/checkpoints/", 
-                              stokes_profile=stokes_profile, test=True)
+    # deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape = output_shape, batch = 1, dataset_path = dataset_path, 
+    #                           network_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/stokes_{stokes_profile.lower()}_model/checkpoints/", 
+    #                           stokes_profile=stokes_profile, test=True)
+    
+    deepvel_net = DeepVel_run(root = main_root, tau = taus[i], test=True, in_shape = input_shape, out_shape=output_shape, batch = 256, dataset_path = dataset_path, 
+                                  network_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/intensity_from_full_cubes_128x128/checkpoints/", stokes_profile=stokes_profile)
+        
     params_model = ckpt
 
     if model_types[i] == ModelType.STOKES_I:
@@ -76,6 +83,9 @@ for i, ckpt in enumerate(checkpoints):
 
     elif model_types[i] == ModelType.STOKES_V:
         input_path = test_path + f"inputs/stokes_V/"
+    
+    elif model_types[i] == ModelType.DEEPVEL_I:
+        input_path = test_path + f"inputs/intensities/"
 
     input_test_data = os.listdir(input_path)
     input_test_data.sort()
@@ -87,41 +97,44 @@ for i, ckpt in enumerate(checkpoints):
     print(f"Evaluating model for tau = {taus[i]} ...")
     for j in range(len(input_test_data)):
         input = torch.from_numpy(np.load(os.path.join(input_path, input_test_data[j])).astype(np.float32))
-        ground_truth = torch.from_numpy(np.load(os.path.join(vel_path, vel_test_data[j])).astype(np.float32))[0][2, :, :].unsqueeze(0) #only take vz for gt since model is only predicting vz
+        ground_truth = torch.from_numpy(np.load(os.path.join(vel_path, vel_test_data[j])).astype(np.float32))[0][:2, :, :]#.unsqueeze(0) #only take vz for gt since model is only predicting vz
         print("GT shape:", ground_truth.shape)
-        #prediction = deepvel_net.predict(input,params_model)    
-        prediction = infer_with_sliding_windows(deepvel_net, params_model, input=torch.from_numpy(np.array([input])), window = 256)
+        print("Input shape:", input.shape)
+        #input = torch.stack((input, input), dim=0) # NOTE doubling input channels for stokes I models since they were trained with 2 channels, both being the same stokes I map
+        prediction = deepvel_net.predict(input,params_model)    
+        # prediction = infer_with_sliding_windows(deepvel_net, params_model, input=torch.from_numpy(np.array([input])), window = 256)
 
-        # divergence_orig = get_divergence(ground_truth[0], ground_truth[1])
-        # divergence_pred = get_divergence(prediction[0], prediction[1])
-        # vorticity_orig = get_vorticity(ground_truth[0], ground_truth[1])
-        # vorticity_pred = get_vorticity(prediction[0], prediction[1])
+        divergence_orig = get_divergence(ground_truth[0], ground_truth[1])
+        divergence_pred = get_divergence(prediction[0], prediction[1])
+        vorticity_orig = get_vorticity(ground_truth[0], ground_truth[1])
+        vorticity_pred = get_vorticity(prediction[0], prediction[1])
 
-        mse_l, rmse_l, pearson2, slope_z = get_all_metrics(ground_truth, prediction).values()
+        # mse_l, rmse_l, pearson2, slope_z = get_all_metrics(ground_truth, prediction).values()
         # print("GT shape:", ground_truth.shape)
-        # mse_l, rmse_l, pearson0, pearson1, pearson2, slope_x, slope_y, slope_z = get_all_metrics(ground_truth, prediction).values()
-        # mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
-        # mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
+        mse_l, rmse_l, pearson0, pearson1,slope_x, slope_y = get_all_metrics(ground_truth, prediction).values()
+        #mse_l, rmse_l, pearson0, pearson1, pearson2, slope_x, slope_y, slope_z = get_all_metrics(ground_truth, prediction).values()
+        mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
+        mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
 
         row = {
             'tau': taus[i],
             'sample_index': j,
             'mse_vel': mse_l,
             'rmse_vel': rmse_l,
-            # 'pearson_vel_x': pearson0,
-            # 'pearson_vel_y': pearson1,
-            'pearson_vel_z': pearson2,
-            # 'slope_vel_x': slope_x,
-            # 'slope_vel_y': slope_y,
-            'slope_vel_z': slope_z,
-            # 'mse_div': mse_d,
-            # 'rmse_div': rmse_d,
-            # 'pearson_div': pearson_d,
-            # 'slope_div': slope_d,
-            # 'mse_vort': mse_v,
-            # 'rmse_vort': rmse_v,
-            # 'pearson_vort': pearson_v,
-            # 'slope_vort': slope_v
+            'pearson_vel_x': pearson0,
+            'pearson_vel_y': pearson1,
+            #'pearson_vel_z': pearson2,
+            'slope_vel_x': slope_x,
+            'slope_vel_y': slope_y,
+            #'slope_vel_z': slope_z,
+            'mse_div': mse_d,
+            'rmse_div': rmse_d,
+            'pearson_div': pearson_d,
+            'slope_div': slope_d,
+            'mse_vort': mse_v,
+            'rmse_vort': rmse_v,
+            'pearson_vort': pearson_v,
+            'slope_vort': slope_v
         }
         metrics_rows.append(row)
 
@@ -135,9 +148,10 @@ for i, ckpt in enumerate(checkpoints):
     common_csv.append(avg_row)
     df_tau = pd.concat([df_tau, pd.DataFrame([avg_row])], ignore_index=True)
 
-    csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_metrics_tau_{taus[i]}_SLIDING_WINDOWS_256.csv')
+    csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_metrics_tau_{taus[i]}.csv')
     df_tau.to_csv(csv_path_tau, index=False)
-csv_path_tau_all = os.path.join(csv_dir, f'all_{csvs[i]}_metrics_SLIDING_WINDOWS_256.csv')
+
+csv_path_tau_all = os.path.join(csv_dir, f'all_{csvs[i]}_metrics.csv')
 df_tau_all = pd.DataFrame(common_csv)
 df_tau_all.to_csv(csv_path_tau_all, index=False)
 
@@ -146,7 +160,7 @@ df_tau_all.to_csv(csv_path_tau_all, index=False)
 ########## NOTE PLOTTING TEST OF STOKES MODELS ON LAST 2 LAYERS OF SIMULATION ################
 #TESTING DEEPVEL_NET3, v5:
 
-version = "v6_2"
+# version = "v8"
 test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
 # mean = {
 #     "1.0": -1595.796630859375,
@@ -164,64 +178,68 @@ test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/
 #     "1e-4": 132994.109375
 # }
 
-# NOTE FOR V5, V6_1, V7
-# mean = {
-#     "1e-1": -2307.059326171875,
-# }
-
-# std = {
-#     "1e-1": 196654.65625,
-# }
-
-# # NOTE FOR V6_2
+# NOTE FOR V5, V6_1, V7, V8
 mean = {
-    "1e-1": -2357.634521484375,
+    "1.0": -1595.796630859375, #note for v8_2
+    "1e-1": -2307.059326171875,
+    "1e-2": -1066.4248046875,
+    "1e-3": 705.2369995117188,
+    "1e-4": -168.59375
 }
 
 std = {
-    "1e-1": 195649.671875,
+    "1.0": 231733.59375, #note for v8_2
+    "1e-1": 196654.65625,
+    "1e-2": 147546.765625,
+    "1e-3": 118183.453125,
+    "1e-4": 135827.203125
 }
 
-# checkpoints = ["/home/xenoss/dat/thesis/models/v6_1/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_190_0.01202.pt"]
-# checkpoints = ["/home/xenoss/dat/thesis/models/v7/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_192_0.01606.pt"]
-checkpoints = ["/home/xenoss/dat/thesis/models/v6_2/tau_1e-1/stokes_i_vz/checkpoints/DeepVel_torch_epoch_198_0.03582.pt"]
+# # NOTE FOR V6_2
+# mean = {
+#     "1e-1": -2357.634521484375,
+# }
 
-taus= ["1e-1"]
+# std = {
+#     "1e-1": 195649.671875,
+# }
+
+checkpoints = checkpoints_I
+# taus= ["1e-1"]
 model_types = [ModelType.STOKES_I]
-model_names = ["Stokes_I_Vz"]
-input_shape = (2, 622, 12, 12)
-# input_shape = (1, 311, 12, 12)
-out_shape = (1, 12, 12)
+model_names = ["Stokes_I"]
+input_shape = (2, 156, 64, 64)
+out_shape = (2, 64, 64)
 stokes_profile = "I"
 
-for i, tau in enumerate(taus):
+# for i, tau in enumerate(taus):
 
-    model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-    test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-    deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, out_shape=out_shape,batch = 8, dataset_path = dataset_path, network_path = model_path, 
-                              tau=taus[i], stokes_profile=stokes_profile, test=True)
-    params_model = checkpoints[i]
-    print(f"Evaluating model for tau = {taus[i]} ...")
-    plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-                dataset_path = test_path, test_save_path = test_save_path, 
-                name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-                plot_intensity = False, n_input_channels = 1, scatter_dim = None, zoom_out = 0, 
-                write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=True)
+    # model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
+    # test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
+    # deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, out_shape=out_shape,batch = 8, dataset_path = dataset_path, network_path = model_path, 
+    #                           tau=taus[i], stokes_profile=stokes_profile, test=True)
+    # params_model = checkpoints[i]
+    # print(f"Evaluating model for tau = {taus[i]} ...")
+    # plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
+    #             dataset_path = test_path, test_save_path = test_save_path, 
+    #             name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
+    #             plot_intensity = False, n_input_channels = 1, scatter_dim = None, zoom_out = 0, 
+    #             write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
+    #             title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=False)
     
-for i, tau in enumerate(taus):
+# for i, tau in enumerate(taus):
 
-    model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-    test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-    deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, out_shape=out_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, 
-                              tau=taus[i], stokes_profile=stokes_profile, test=True)
-    params_model = checkpoints[i]
-    print(f"Evaluating model for tau = {taus[i]} ...")
-    plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-                dataset_path = test_path, test_save_path = test_save_path, 
-                name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-                plot_intensity = False, n_input_channels = 1, scatter_dim = None, zoom_out = 0, 
-                write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=True)
+#     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
+#     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
+#     deepvel_net = DeepVel_run(root = main_root, in_shape=input_shape, out_shape=out_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, 
+#                               tau=taus[i], stokes_profile=stokes_profile, test=True)
+#     params_model = checkpoints[i]
+#     print(f"Evaluating model for tau = {taus[i]} ...")
+#     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
+#                 dataset_path = test_path, test_save_path = test_save_path, 
+#                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
+#                 plot_intensity = False, n_input_channels = 1, scatter_dim = None, zoom_out = 0, 
+#                 write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
+#                 title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows=False)
     
 #######################################################################################

@@ -13,18 +13,16 @@ https://www.aanda.org/articles/aa/pdf/2017/08/aa30783-17.pdf
 
 - Neural network models, based on the DeepVel network, for velocity field prediction with variable temporal and spatial input extent
 - Physics-informed loss functions (MSE of: velocity, divergence, vorticity)
-- Hybrid input models with multiple physical inputs (intensity, magnetic field, vertical velocity)
+- Hybrid input models with multiple physical inputs (Stokes I and Stokes V)
 - Data normalization/denormalization codes
-- Evaluation metrics: MSE, RMSE, Pearson correlation (vx and vy), slope (vy and vy)- for the velocities, divergence and vorticity
-- Visualization: prediction maps, scatter plots, plots with visualized arrows, heatmaps
+- Evaluation metrics: MSE, RMSE, Pearson correlation (vx, vy, vz), slope (vx, vy, vz)- for the velocities, divergence and vorticity
+- Visualization: prediction maps, scatter plots, plots (with visualized arrows)
 
 ## Getting Started
 
 ### Prerequisites
 
 - Python 3.8+
-- PyTorch (with CUDA for GPU support)
-- numpy, matplotlib, pandas, seaborn, h5py, scipy
 
 ### Installation
 
@@ -46,7 +44,7 @@ Train a model using:
 ```bash
 python deepvel_torch.py
 ```
-Hybrid-input DeepVel model variants are defined in `hybrid_deepvel_torch.py` and `hybrid_deepvel_torch_v2.py`
+Hybrid-input DeepVel model variants are defined in `hybrid_deepvel_torch.py`
 
 Train a model using:
 
@@ -54,17 +52,18 @@ Train a model using:
 python hybrid_deepvel_torch.py
 ```
 
-or
-
-```bash
-python hybrid_deepvel_torch_v2.py
-```
 ### Evaluation and Visualization
 
 Evaluate models and generate plots (first uncomment the chosen evaluation and adjust the paths):
 
 ```bash
-python test_5x5_experiments.py
+python test_stokes_deepvel.py
+```
+
+or
+
+```bash
+python test_hybrid_stokes.py
 ```
 
 ## Data

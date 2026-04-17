@@ -121,7 +121,8 @@ def get_all_metrics(original, predicted, is_divergence=False):
             "slope": slope_x
         }
     else:
-        if original.shape[0] < 3 or predicted.shape[0] < 3:
+        
+        if original.shape[0] == 1 or predicted.shape[0] == 1:
             #this is the case for vz only model where we only have 1 channel in gt and pred
             orig_2 = original[0, :, :].cpu().numpy()
             pred_2 = predicted[0, :, :].cpu().numpy()
@@ -135,6 +136,31 @@ def get_all_metrics(original, predicted, is_divergence=False):
                 "slope_vz": slope_z
             }
         
+        elif original.shape[0] == 2 or predicted.shape[0] == 2:
+            orig_0 = original[0, :, :].cpu().numpy()
+            orig_1 = original[1, :, :].cpu().numpy()
+            
+            pred_0 = predicted[0, :, :].cpu().numpy()
+            pred_1 = predicted[1, :, :].cpu().numpy()
+            
+
+            slope_x, intercept_x, r_value_x, p_value_x, std_err_x = linregress(orig_0.flatten(), pred_0.flatten())
+            slope_y, intercept_y, r_value_y, p_value_y, std_err_y = linregress(orig_1.flatten(), pred_1.flatten())
+            
+
+            pearsons = calculate_correlation(original, predicted)
+            pearson0 = pearsons[0].statistic
+            pearson1 = pearsons[1].statistic
+            
+
+            return {
+                "mse": mse_l.item(), 
+                "rmse": rmse_l.item(),
+                "pearson_vx": pearson0.item(),
+                "pearson_vy": pearson1.item(),
+                "slope_vx": slope_x,
+                "slope_vy": slope_y
+            }
 
         else:
             orig_0 = original[0, :, :].cpu().numpy()

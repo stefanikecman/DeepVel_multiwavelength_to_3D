@@ -228,9 +228,10 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
     else:
         velocity_full_map = np.load(os.path.join(dataset_path, f"labels/velocities_{n_input_channels}.npy"))
         
-    if model_type == ModelType.STOKES_IV or model_type == ModelType.STOKES_I: #TODO: refactor to work with different shapes of velocities, currently only works with 3 channels
+    if model_type == ModelType.STOKES_IV or model_type == ModelType.STOKES_I or model_type == ModelType.STOKES_V: #TODO: refactor to work with different shapes of velocities, currently only works with 3 channels
         print("Velocity full map shape before slicing:", velocity_full_map.shape)
-        velocity_full_map = velocity_full_map[:, 2, :, :]
+        #velocity_full_map = velocity_full_map[:, 2, :, :] #for vz only inference
+        velocity_full_map = velocity_full_map[:, :2, :, :]
         print("Velocity full map shape after slicing:", velocity_full_map.shape)
 
     if velocity_full_map.ndim == 4:
@@ -256,6 +257,7 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
             vz_to_plot = vz[:, h1:h2, w1:w2]
         if stokes_I is not None:
             stokes_I_to_plot = stokes_I[:, h1:h2, w1:w2]
+            #stokes_I_to_plot = torch.stack((stokes_I_to_plot, stokes_I_to_plot), dim=0) #NOTE just for one test - duplicate the stokes I to have 2 channels for the model
         if stokes_V is not None:
             stokes_V_to_plot = stokes_V[:, h1:h2, w1:w2]
         velocity_to_plot = velocity_full_map[:, h1:h2, w1:w2]

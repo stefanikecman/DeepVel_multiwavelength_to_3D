@@ -12,9 +12,6 @@ from metrics_and_plotting import ModelType, plot_prediction_and_scatter_full_map
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 main_root = "/home/xenoss/dat/thesis/"
-version = "v4"
-dataset_path = f'/home/xenoss/dat/thesis/data/{version}/dataset/train/'
-metrics_by_tau = OrderedDict()
 
 ################## NOTE PLOTTING LOSS CURVES FOR HYBRID STOKES MODELS #####################
 # tau = ["1.0", "1e-1", "1e-2", "1e-3", "1e-4"]
@@ -53,20 +50,20 @@ metrics_by_tau = OrderedDict()
 
 
 #experiment 3: mapping vz only with v2 dataset / 16x16, only 1e-1 tau level for now
-version = "v4"
-# checkpoints = ["/dat/xenoss/thesis/models/v3/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_152_0.01942.pt"]
-# checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_175_0.02820.pt"]
-checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-3/hybrid_vz/checkpoints/DeepVel_torch_epoch_48_0.05760.pt"]
-model_names = ["Hybrid_Vz"]
+version = "v8"
+checkpoints = ["/dat/xenoss/thesis/models/v8/tau_1e-2/hybrid_vz/checkpoints/DeepVel_torch_epoch_183_0.03890.pt",
+               "/dat/xenoss/thesis/models/v8/tau_1e-3/hybrid_vz/checkpoints/DeepVel_torch_epoch_165_0.09602.pt",
+               "/dat/xenoss/thesis/models/v8/tau_1e-4/hybrid_vz/checkpoints/DeepVel_torch_epoch_189_0.11530.pt"]
+
+model_names = ["Hybrid_Vz", "Hybrid_Vz", "Hybrid_Vz"]
 test_path = f'/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/'
 
-#model_paths = ["/dat/xenoss/thesis/models/"]
-
-input_shape = (2, 175, 16, 16)
-# input_shape = (2, 89, 16, 16)
-out_shape = (1, 16, 16)
-model_types = [ModelType.STOKES_IV]
-taus = ["1e-3"]
+dataset_path = f'/home/xenoss/dat/thesis/data/{version}/dataset/train/'
+metrics_by_tau = OrderedDict()
+input_shape = (1, 156, 12, 12)
+out_shape = (1, 12, 12)
+model_types = [ModelType.STOKES_IV, ModelType.STOKES_IV, ModelType.STOKES_IV]
+taus = ["1e-2", "1e-3", "1e-4"]
 
 csvs = [f"hybrid_stokes_vz_{version}_{taus[i]}_" for i in range(len(taus))]
 common_csv = []
@@ -162,13 +159,13 @@ for i, ckpt in enumerate(checkpoints):
     common_csv.append(avg_row)
     df_tau = pd.concat([df_tau, pd.DataFrame([avg_row])], ignore_index=True)
 
-    csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_metrics_tau_{taus[i]}.csv')
+    csv_path_tau = os.path.join(csv_dir, f'{csvs[i]}_{version}_metrics_tau_{taus[i]}.csv')
     df_tau.to_csv(csv_path_tau, index=False)
 
-# df_tau_all = pd.DataFrame(common_csv)
-# # csv_path_tau = os.path.join(csv_dir, f'all_hybrid_metrics.csv')
-# csv_path_tau = os.path.join(csv_dir, f'all_hybrid_vz_{version}_metrics.csv')
-# df_tau_all.to_csv(csv_path_tau, index=False)
+df_tau_all = pd.DataFrame(common_csv)
+# csv_path_tau = os.path.join(csv_dir, f'all_hybrid_metrics.csv')
+csv_path_tau = os.path.join(csv_dir, f'all_hybrid_vz_{version}_metrics.csv')
+df_tau_all.to_csv(csv_path_tau, index=False)
 
 #######################################################################################
 
@@ -178,22 +175,35 @@ for i, ckpt in enumerate(checkpoints):
 # checkpoints = ["/home/xenoss/dat/thesis/models/v3/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_152_0.01942.pt"]
 # # #checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_111_0.01947.pt"]
 
+# mean = {
+#     "1.0": -1595.796630859375,
+#     "1e-1": -2357.634521484375,
+#     "1e-2": -1106.9403076171875,
+#     "1e-3": 655.9984741210938,
+#     "1e-4": -227.47628784179688
+# }
+
+# std = {
+#     "1.0": 231733.59375,
+#     "1e-1": 195649.671875,
+#     "1e-2": 146830.328125,  
+#     "1e-3": 116736.734375,
+#     "1e-4": 132994.109375
+#  }
+# NOTE FOR V5, V6_1, V7, V8
 mean = {
-    "1.0": -1595.796630859375,
-    "1e-1": -2357.634521484375,
-    "1e-2": -1106.9403076171875,
-    "1e-3": 655.9984741210938,
-    "1e-4": -227.47628784179688
+    "1e-1": -2307.059326171875,
+    "1e-2": -1066.4248046875,
+    "1e-3": 705.2369995117188,
+    "1e-4": -168.59375
 }
 
 std = {
-    "1.0": 231733.59375,
-    "1e-1": 195649.671875,
-    "1e-2": 146830.328125,  
-    "1e-3": 116736.734375,
-    "1e-4": 132994.109375
- }
-
+    "1e-1": 196654.65625,
+    "1e-2": 147546.765625,
+    "1e-3": 118183.453125,
+    "1e-4": 135827.203125
+}
 # #TODO COMPUTE MEAN AND STD OF OF VZ ONLY
 # taus= ["1e-1",]
 # model_types = [ModelType.STOKES_IV]
@@ -217,97 +227,35 @@ std = {
     
 # #######################################################################################
 # version = "v3"
-# test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
-# checkpoints = ["/home/xenoss/dat/thesis/models/v3/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_152_0.01942.pt"]
-# # #checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_111_0.01947.pt"]
-
+test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
+# checkpoints = [f"/home/xenoss/dat/thesis/models/{version}/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_187_0.01990.pt"]
 # taus= ["1e-1",]
 # model_types = [ModelType.STOKES_IV]
 # model_names = ["Hybrid_Vz"]
 # input_shape = (2, 89, 16, 16)
 # out_shape = (1, 16, 16)
 
-# for i, tau in enumerate(taus):
+for i, tau in enumerate(taus):
 
-#     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-#     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape=out_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, test=True)
-#     params_model = checkpoints[i]
-#     print(f"Evaluating model for tau = {taus[i]} ...")
-#     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-#                 dataset_path = test_path, test_save_path = test_save_path, 
-#                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-#                 plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
-#                 write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-#                 title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = False)
-# #############################
-
-# version = "v4"
-# test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
-# #checkpoints = ["/home/xenoss/dat/thesis/models/v3/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_152_0.01942.pt"]
-# checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_111_0.01947.pt"]
-
-# taus= ["1e-1",]
-# model_types = [ModelType.STOKES_IV]
-# model_names = ["Hybrid_Vz"]
-# input_shape = (2, 175, 16, 16)
-# out_shape = (1, 16, 16)
-
-# for i, tau in enumerate(taus):
-
-#     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-#     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape=out_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, test=True)
-#     params_model = checkpoints[i]
-#     print(f"Evaluating model for tau = {taus[i]} ...")
-#     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-#                 dataset_path = test_path, test_save_path = test_save_path, 
-#                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-#                 plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
-#                 write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-#                 title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = False)
+    model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
+    test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
+    deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape=out_shape, batch = 8, 
+                              dataset_path = dataset_path, network_path = model_path, test=True)
+    params_model = checkpoints[i]
+    print(f"Evaluating model for tau = {taus[i]} ...")
+    plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
+                dataset_path = test_path, test_save_path = test_save_path, 
+                name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
+                plot_intensity = False, n_input_channels = input_shape[0], scatter_dim = None, zoom_out = 0, 
+                write_metrics = False,denormalized=False, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
+                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = False)
     
-# for i, tau in enumerate(taus):
-
-#     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-#     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape=out_shape, batch = 8, dataset_path = dataset_path, network_path = model_path, test=True)
-#     params_model = checkpoints[i]
-#     print(f"Evaluating model for tau = {taus[i]} ...")
-#     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-#                 dataset_path = test_path, test_save_path = test_save_path, 
-#                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-#                 plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
-#                 write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-#                 title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = True)
-
-
-####################################################
-#TESTING DEEPVEL_NET2, v4:
-# version = "v4"
-# test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
-# # checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_175_0.02820.pt"]
-# # checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid/checkpoints/DeepVel_torch_epoch_184_0.11028.pt"]
-# checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-3/hybrid_vz/checkpoints/DeepVel_torch_epoch_48_0.05760.pt"]
-# taus= ["1e-3"]
-# model_types = [ModelType.STOKES_IV]
-# model_names = ["Hybrid_Vz"]
-# input_shape = (2, 175, 16, 16)
-# out_shape = (1, 16, 16)
-
-# for i, tau in enumerate(taus):
-
-#     model_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/checkpoints/"
-#     test_save_path = f"/home/xenoss/dat/thesis/models/{version}/tau_{taus[i]}/{(model_names[0]).lower()}/test/"
-#     deepvel_net = DeepVel_run(root = main_root, tau = taus[i], in_shape = input_shape, out_shape=out_shape, batch = 1, dataset_path = dataset_path, network_path = model_path, test=True)
-#     params_model = checkpoints[i]
-#     print(f"Evaluating model for tau = {taus[i]} ...")
-#     plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
-#                 dataset_path = test_path, test_save_path = test_save_path, 
-#                 name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
-#                 plot_intensity = False, n_input_channels = 2, scatter_dim = None, zoom_out = 0, 
-#                 write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
-#                 title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = False)
+    plot_prediction_and_scatter_full_map_vertical(deepvel_object = deepvel_net, params_model = params_model, 
+                dataset_path = test_path, test_save_path = test_save_path, 
+                name = f"{model_names[0]}_{taus[i]}", zoomed_in_size = None, 
+                plot_intensity = False, n_input_channels = input_shape[0], scatter_dim = None, zoom_out = 0, 
+                write_metrics = False,denormalized=True, mean_vel=[mean[taus[i]]], std_vel=[std[taus[i]]], return_metrics = False, model_type = model_types[i], 
+                title = model_names[0]+", tau = " + taus[i], tau = taus[i], sliding_windows = False)
 
 ############################ NOTE TESTING ON TRAIN DATA: ####################################
 # checkpoints = ["/home/xenoss/dat/thesis/models/v4/tau_1e-1/hybrid_vz/checkpoints/DeepVel_torch_epoch_175_0.02820.pt"]
