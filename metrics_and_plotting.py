@@ -216,7 +216,7 @@ def add_colorbar(im, ax, label=None):
         cbar.set_label(label)
     return cbar
 
-def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type: ModelType, tau = None, zoomed_in_size = None, sliding_windows = False):
+def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, n_out_channels, model_type: ModelType, tau = None, zoomed_in_size = None, sliding_windows = False):
 
     inputs = load_data_based_on_model_type(dataset_path, n_input_channels, model_type, tau)
 
@@ -227,12 +227,11 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
         velocity_full_map = np.load(os.path.join(dataset_path, f"labels/tau_{tau}/velocities_tau_{tau}.npy"))
     else:
         velocity_full_map = np.load(os.path.join(dataset_path, f"labels/velocities_{n_input_channels}.npy"))
-        
-    if model_type == ModelType.STOKES_IV or model_type == ModelType.STOKES_I or model_type == ModelType.STOKES_V: #TODO: refactor to work with different shapes of velocities, currently only works with 3 channels
-        print("Velocity full map shape before slicing:", velocity_full_map.shape)
-        #velocity_full_map = velocity_full_map[:, 2, :, :] #for vz only inference
-        velocity_full_map = velocity_full_map[:, :2, :, :]
-        print("Velocity full map shape after slicing:", velocity_full_map.shape)
+
+    if n_out_channels == 1:
+        velocity_full_map = velocity_full_map[:, 2, :, :] #for vz only inference
+    elif n_out_channels == 2:
+        velocity_full_map = velocity_full_map[:, :2, :, :] #for vx, vy inference
 
     if velocity_full_map.ndim == 4:
         velocity_full_map = velocity_full_map[0]
@@ -276,6 +275,9 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
     vz_to_plot = to_torch(vz_to_plot)
     stokes_I_to_plot = to_torch(stokes_I_to_plot)
     stokes_V_to_plot = to_torch(stokes_V_to_plot)
+    
+    
+    
 
     if model_type == ModelType.HYBRID_IBvz:
         velocity_pred = deepvel_object.predict(intensity_to_plot, B_to_plot, vz_to_plot, params_model)
@@ -293,10 +295,10 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
         velocity_pred = deepvel_object.predict(intensity_to_plot, params_model)
     
     elif model_type == ModelType.DEEPVEL_Vz:
-        print("Predicting Vz only")
         velocity_pred = deepvel_object.predict(vz_to_plot, params_model)
 
     elif model_type == ModelType.STOKES_I:
+        stokes_I_to_plot = stokes_I_to_plot.unsqueeze(0) if n_out_channels==1 else stokes_I_to_plot
         if sliding_windows:
             print("Predicting with sliding windows")
             velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_I_to_plot])), window=256, overlap=0)
@@ -304,6 +306,7 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
             velocity_pred = deepvel_object.predict(stokes_I_to_plot, params_model)
 
     elif model_type == ModelType.STOKES_V:
+        stokes_V_to_plot = stokes_V_to_plot.unsqueeze(0) if n_out_channels==1 else stokes_V_to_plot
         if sliding_windows:
             print("Predicting with sliding windows")
             velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_V_to_plot])), window=256, overlap=0)
@@ -311,6 +314,8 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
             velocity_pred = deepvel_object.predict(stokes_V_to_plot, params_model)
         
     elif model_type == ModelType.STOKES_IV:
+        stokes_I_to_plot = stokes_I_to_plot.unsqueeze(0) if n_out_channels==1 else stokes_I_to_plot
+        stokes_V_to_plot = stokes_V_to_plot.unsqueeze(0) if n_out_channels==1 else stokes_V_to_plot
         if sliding_windows:
             print("Predicting with sliding windows")
             velocity_pred = infer_with_sliding_windows(deepvel_object, params_model, torch.from_numpy(np.array([stokes_I_to_plot, stokes_V_to_plot])), window=256, overlap=0)
@@ -593,7 +598,7 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
 #        }
 
 
-def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = False, n_input_channels = 2, 
+def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = False, n_input_channels = 2, n_out_channels = 3, 
                                                    scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, mean_vel = None, std_vel = None, return_metrics = False, 
                                                    model_type = ModelType.DEEPVEL_I, title = None, tau = None, sliding_windows = False):
     """
@@ -620,7 +625,7 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     plt.rcParams['font.size'] = 50
 
     inputs, velocity_to_plot, velocity_pred = load_data_and_get_predictions(deepvel_object, params_model, dataset_path, 
-                                                                            n_input_channels, model_type, tau, zoomed_in_size, 
+                                                                            n_input_channels, n_out_channels, model_type, tau, zoomed_in_size, 
                                                                             sliding_windows = sliding_windows)
     intensity_to_plot = inputs["intensity"]
 
@@ -875,14 +880,14 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     if test_save_path is not None:
         if denormalized:
             if sliding_windows:
-                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_sliding_windows_' + name + '_DV3.png'))
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_sliding_windows_' + name + '_.png'))
             else:
-                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_' + name + '_DV3.png'))
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_denormalized_' + name + '.png'))
         else:
             if sliding_windows:
-                fig.savefig(os.path.join(test_save_path, 'full_analysis_sliding_windows_' + name + '_DV3.png'))
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_sliding_windows_' + name + '.png'))
             else:
-                fig.savefig(os.path.join(test_save_path, 'full_analysis_' + name + '_DV3.png'))
+                fig.savefig(os.path.join(test_save_path, 'full_analysis_' + name + '.png'))
     plt.close(fig)
 
     if return_metrics:

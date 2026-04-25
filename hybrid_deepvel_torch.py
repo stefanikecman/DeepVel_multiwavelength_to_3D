@@ -31,6 +31,10 @@ class dataset_deepVel(Dataset):
         velocities.sort()
         stokes_I.sort()
         stokes_V.sort()
+
+        stokes_I = stokes_I[:31360] #only for experiment 1
+        stokes_V = stokes_V[:31360] #only for experiment 1
+        velocities = velocities[:31360] #only for experiment 1
  
         # self.velocities = velocities
         # self.stokes_I = stokes_I
@@ -66,6 +70,9 @@ class dataset_deepVel(Dataset):
 
             if self.out_channels == 1:
                 self.velocities = [vel[2,:,:].unsqueeze(0) for vel in self.velocities]
+
+            elif self.out_channels == 2:
+                self.velocities = [vel[:2,:,:].unsqueeze(0) for vel in self.velocities]
 
             print("Loaded {} velocity files, {} stokes I files, {} stokes V files.".format(len(self.velocities), len(self.stokes_I), len(self.stokes_V)))
 
@@ -111,7 +118,7 @@ class dataset_deepVel(Dataset):
         Args:
             idx: Index of the data point to retrieve
         Returns:
-            Tuple of (magnetic field, vz, velocity) tensors
+            Tuple of (Stokes I, Stokes V, velocity) tensors
         Raises:
             ValueError: If the input and label data do not correspond
         """
@@ -642,14 +649,13 @@ if (__name__ == '__main__'):
     main_root = "/dat/xenoss/"
 
     ######### NOTE training multiheight models ########
-    taus = ["1e-2", "1e-3", "1e-4"]
+    taus = ["1e-1", "1e-2", "1e-3", "1e-4"]
     version = "v8"
     dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset/train/'
     input_shape = (1, 156, 12, 12)  # (channels, wavelengths, height, width)
-    # output_shape = (3, 64, 64)    # (velocity components, height, width)
-    output_shape = (1, 12, 12)    # (vz, height, width)
+    output_shape = (1, 12, 12)    # (velocity components, height, width)
 
     for tau in taus:
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, in_shape = input_shape, out_shape=output_shape,batch = 256, 
-                                  dataset_path = dataset_path, network_path = f"/scratch/xenoss/hybrid_vz_{version}/tau_{tau}/checkpoints/")
+        deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 256, dataset_path = dataset_path, 
+                                    network_path = f"/scratch/xenoss/{version}/tau_{tau}/hybrid_model/checkpoints/")
         deepvel_net.train(200)
