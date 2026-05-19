@@ -14,7 +14,7 @@ https://www.aanda.org/articles/aa/pdf/2017/08/aa30783-17.pdf
 - Hybrid input models with multiple physical inputs (Stokes I and Stokes V)
 - Data normalization/denormalization codes
 - Evaluation metrics: MSE, RMSE, Pearson correlation (vx, vy, vz), slope (vx, vy, vz)- for the velocities, divergence and vorticity
-- Visualization: prediction maps, scatter plots, plots (with visualized arrows)
+- Visualization: prediction maps, scatter plots
 
 ## Getting Started
 
@@ -49,6 +49,21 @@ Train a model using:
 python hybrid_deepvel_torch.py
 ```
 
+Multiheight DeepVel model definition is in `multiheight_deepvel_torch.py`
+
+Train a model using:
+
+```bash
+python multiheight_deepvel_torch.py
+```
+Hybrid-input DeepVel model variants are defined in `multiheight_hybrid_deepvel_torch.py`
+
+Train a model using:
+
+```bash
+python multiheight_hybrid_deepvel_torch.py
+```
+
 ### Evaluation and Visualization
 
 Evaluate models and generate plots (first uncomment the chosen evaluation and adjust the paths):
@@ -61,6 +76,18 @@ or
 
 ```bash
 python test_hybrid_stokes.py
+```
+
+Commands for testing multiheight models are:
+
+```bash
+python test_multiheight_stokes_deepvel.py
+```
+
+or
+
+```bash
+python test_multiheight_hybrid_deepvel.py
 ```
 
 Methods for output visualization are located in ```metrics_and_plotting.py```
