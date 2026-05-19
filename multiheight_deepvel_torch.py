@@ -455,12 +455,11 @@ class DeepVel_run(object):
             x = torch.from_numpy(x.astype(np.float32))
         
         if x.dim() == 3:
-            x = x.unsqueeze(0)#.unsqueeze(0) #patch for the project version
+            x = x.unsqueeze(0).unsqueeze(0)
 
         elif x.dim() == 4:
             x = x.unsqueeze(0)
 
-        #x = normalize_layerwise(x)
         start = time.time()
     
         with torch.no_grad():    

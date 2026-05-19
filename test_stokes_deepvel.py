@@ -138,7 +138,6 @@ df_tau_all.to_csv(csv_path_tau_all, index=False)
 #######################################################################################
 
 ########## NOTE PLOTTING TEST OF STOKES MODELS ON LAST 2 LAYERS OF SIMULATION ################
-#TESTING DEEPVEL_NET3, v5:
 
 test_path = f"/home/xenoss/dat/thesis/data/{version}/dataset/test/last_2_layers/"
 mean = {

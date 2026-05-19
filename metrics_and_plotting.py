@@ -256,7 +256,6 @@ def load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_
             vz_to_plot = vz[:, h1:h2, w1:w2]
         if stokes_I is not None:
             stokes_I_to_plot = stokes_I[:, h1:h2, w1:w2]
-            #stokes_I_to_plot = torch.stack((stokes_I_to_plot, stokes_I_to_plot), dim=0) #NOTE just for one test - duplicate the stokes I to have 2 channels for the model
         if stokes_V is not None:
             stokes_V_to_plot = stokes_V[:, h1:h2, w1:w2]
         velocity_to_plot = velocity_full_map[:, h1:h2, w1:w2]
@@ -542,60 +541,6 @@ def plot_scatter_plot (original_velocity, predicted_velocity, path_save, filenam
     plt.savefig(os.path.join(path_save, filename + '.png'))
     plt.close()
 
-# def plot_test_full_map (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = True, n_input_channels = 2, 
-#                                                    scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, return_metrics = False, model_type = ModelType.DEEPVEL_I, title = None, tau = None, arrows = False):
-#     """
-#     Plot predictions and scatter plots for a full map in a vertical layout.
-#     Args:
-#         deepvel_object: Instance of the DeepVel model
-#         params_model: Model parameters
-#         dataset_path: Path where the dataset is located
-#         test_save_path: Directory to save the test plots
-#         name: Base name for the saved plot files
-#         zoomed_in_size: Optional tuple specifying the size to zoom in on (height, width)
-#         plot_intensity: Boolean indicating whether to plot intensity maps
-#         n_input_channels: Number of input channels in the intensity map (2, 4, or 6)
-#         scatter_dim: Optional tuple specifying the dimensions to zoom in on for scatter plot (height, width)
-#         zoom_out: Value to expand the axes limits for better visualization in scatter plot
-#         write_metrics: Boolean indicating whether to write metrics on the plot
-#         denormalized: Boolean indicating whether to denormalize velocity data before plotting
-#         return_metrics: Boolean indicating whether to return calculated metrics
-#         model_type: Enum indicating the model type (DEEPVEL_I, DEEPVEL_B, HYBRID_Bvz, HYBRID_IBvz, STOKES_I, STOKES_V, STOKES_IV)
-#         title: Optional title for the plot
-#         arrows: Boolean indicating whether to overlay arrows on velocity fields
-#         tau: Optional optical depth parameter
-#     """
-
-#     plt.rcParams['font.size'] = 40
-#     inputs, velocity_to_plot, velocity_pred = load_data_and_get_predictions(deepvel_object, params_model, dataset_path, n_input_channels, model_type, tau, zoomed_in_size)
-#     extent = [0, velocity_to_plot.shape[1]*0.016, 0, velocity_to_plot.shape[0]*0.016]
-
-#     intensity_to_plot = inputs["intensity"]
-    
-#     plot_predictions(
-#         intensity_to_plot, velocity_to_plot, velocity_pred,
-#         test_save_path, name,
-#         plot_intensity=plot_intensity,
-#         arrows=arrows
-#     )
-#     plot_scatter_plot(velocity_to_plot, velocity_pred, test_save_path, 'scatter_'+name)
-
-#     #NOTE: I CAME TO HERE, REFACTOR THE DIV AND VORT
-#     divergence_orig = get_divergence(velocity_to_plot[0].cpu().numpy(), velocity_to_plot[1].cpu().numpy())
-#     divergence_pred = get_divergence(velocity_pred[0].cpu().numpy(), velocity_pred[1].cpu().numpy())
-#     vorticity_orig = get_vorticity(velocity_to_plot[0].cpu().numpy(), velocity_to_plot[1].cpu().numpy())
-#     vorticity_pred = get_vorticity(velocity_pred[0].cpu().numpy(), velocity_pred[1].cpu().numpy())
-
-#     mse_l, rmse_l, pearson0, pearson1, slope_x, slope_y = get_all_metrics(velocity_to_plot, velocity_pred).values()
-#     mse_d, rmse_d, pearson_d, slope_d = get_all_metrics(divergence_orig, divergence_pred, is_divergence=True).values()
-#     mse_v, rmse_v, pearson_v, slope_v = get_all_metrics(vorticity_orig, vorticity_pred, is_divergence=True).values()
-
-#     if return_metrics:
-#         return {
-#             "mse": mse_l, "rmse": rmse_l, "pearson_vx": pearson0, "pearson_vy": pearson1, "slope_vx": slope_x, "slope_vy": slope_y, 
-#             "mse_divergence": mse_d, "rmse_divergence": rmse_d, "pearson_divergence": pearson_d, "slope_divergence": slope_d,
-#             "mse_vorticity": mse_v, "rmse_vorticity": rmse_v, "pearson_vorticity": pearson_v, "slope_vorticity": slope_v
-#        }
 
 
 def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model, dataset_path, test_save_path, name, zoomed_in_size = None, plot_intensity = False, n_input_channels = 2, n_out_channels = 3, 
@@ -631,14 +576,10 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
 
     extent = [0, velocity_to_plot.shape[2]*0.016, 0, velocity_to_plot.shape[1]*0.016]
         
-    # print("velocity_to_plot shape:", velocity_to_plot.shape)
-    # print("velocity_pred shape:", velocity_pred.shape)
     mse_l = nn.functional.mse_loss(velocity_pred.to(device), velocity_to_plot.to(device))
     rmse_l = torch.sqrt(mse_l)
 
     matplotlib.use('agg')
-    # plt.figure()
-
     nrows = 4 if plot_intensity else 3
     ncols = velocity_to_plot.shape[0]    
 
@@ -646,8 +587,6 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
     elif velocity_to_plot.shape[0]==2: figsize=(37, 45)
     else: figsize = (15, 40)
 
-    # fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize, squeeze=False, constrained_layout=True)
-    # plt.subplots_adjust(hspace=0.4)
     fig, ax = plt.subplots(nrows = nrows, ncols = ncols, figsize=figsize, squeeze=False)
     plt.subplots_adjust(hspace=0.35, top=0.90, bottom=0.08, right=0.92)
 
@@ -668,8 +607,6 @@ def plot_prediction_and_scatter_full_map_vertical (deepvel_object, params_model,
         vel_2_pred = velocity_pred[2, :, :].cpu().numpy()
 
     idx = 0
-
-    #TODO intensity denormalization option
 
     if plot_intensity == True:
         middle_channel = int(n_input_channels/2)
@@ -910,25 +847,24 @@ def plot_prediction_and_scatter_full_map_vertical_multiheight (deepvel_object, p
                                                    scatter_dim = None, zoom_out = 0, write_metrics = False, denormalized = False, mean_vels = None, std_vels = None, return_metrics = False, 
                                                    model_type = ModelType.DEEPVEL_I, title = None, taus = None):
     """
-    TODO rewrite the description
-    # Plot predictions and scatter plots for a full map in a vertical layout.
-    # Args:
-    #     deepvel_object: Instance of the DeepVel model
-    #     params_model: Model parameters
-    #     dataset_path: Path where the dataset is located
-    #     test_save_path: Directory to save the test plots
-    #     name: Base name for the saved plot files
-    #     zoomed_in_size: Optional tuple specifying the size to zoom in on (height, width)
-    #     plot_intensity: Boolean indicating whether to plot intensity maps
-    #     n_input_channels: Number of input channels in the intensity map (2, 4, or 6)
-    #     scatter_dim: Optional tuple specifying the dimensions to zoom in on for scatter plot (height, width)
-    #     zoom_out: Value to expand the axes limits for better visualization in scatter plot
-    #     write_metrics: Boolean indicating whether to write metrics on the plot
-    #     denormalized: Boolean indicating whether to denormalize velocity data before plotting
-    #     return_metrics: Boolean indicating whether to return calculated metrics
-    #     model_type: Enum indicating the model type (DEEPVEL_I, DEEPVEL_B, HYBRID1, HYBRID_Bvz)
-    #     title: Optional title for the plot
-    #     tau: Optional optical depth parameter
+    Plot predictions and scatter plots for a full map in a vertical layout.
+    Args:
+        deepvel_object: Instance of the DeepVel model
+        params_model: Model parameters
+        dataset_path: Path where the dataset is located
+        test_save_path: Directory to save the test plots
+        name: Base name for the saved plot files
+        zoomed_in_size: Optional tuple specifying the size to zoom in on (height, width)
+        plot_intensity: Boolean indicating whether to plot intensity maps
+        n_input_channels: Number of input channels in the intensity map (2, 4, or 6)
+        scatter_dim: Optional tuple specifying the dimensions to zoom in on for scatter plot (height, width)
+        zoom_out: Value to expand the axes limits for better visualization in scatter plot
+        write_metrics: Boolean indicating whether to write metrics on the plot
+        denormalized: Boolean indicating whether to denormalize velocity data before plotting
+        return_metrics: Boolean indicating whether to return calculated metrics
+        model_type: Enum indicating the model type
+        title: Optional title for the plot
+        tau: Optional optical depth parameter
     """
     plt.rcParams['font.size'] = 50
     n_input_channels = input_shape[0]
@@ -985,9 +921,6 @@ def plot_prediction_and_scatter_full_map_vertical_multiheight (deepvel_object, p
             vel_2_pred = velocity_pred[2, :, :].cpu().numpy()
 
         idx = 0
-
-        #TODO intensity denormalization option
-
 
         if denormalized:
             if std_vel is None:

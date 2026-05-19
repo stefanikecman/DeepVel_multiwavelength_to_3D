@@ -123,7 +123,7 @@ def get_all_metrics(original, predicted, is_divergence=False):
     else:
         
         if original.shape[0] == 1 or predicted.shape[0] == 1:
-            #this is the case for vz only model where we only have 1 channel in gt and pred
+            #this is the case for vz only model
             orig_2 = original[0, :, :].cpu().numpy()
             pred_2 = predicted[0, :, :].cpu().numpy()
             slope_z, intercept_z, r_value_z, p_value_z, std_err_z = linregress(orig_2.flatten(), pred_2.flatten())

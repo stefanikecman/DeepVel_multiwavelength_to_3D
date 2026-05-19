@@ -471,8 +471,6 @@ class DeepVel_run(object):
             self.summary = summary(self.model, input_data = (torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width), torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width)), device=device)
 
         self.criterion = nn.MSELoss()
-        # self.criterion = div_vor_loss
-        # self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1=1.0, alpha2=1e8, alpha3=1e8)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
 
     def train(self, epochs):
@@ -625,7 +623,6 @@ class DeepVel_run(object):
         else:
             self.model.load_state_dict(model_weights)
         self.model.eval()
-        # print("Model input shapes:", I.shape, V.shape)
         I = self.to_tensor(I)
         V = self.to_tensor(V)
         
@@ -636,7 +633,6 @@ class DeepVel_run(object):
         print("Prediction took {0} seconds...".format(end - start))
 
         output = output.squeeze(0)
-        # print("Model output shape:", output.shape)
         return output
        
 if (__name__ == '__main__'):

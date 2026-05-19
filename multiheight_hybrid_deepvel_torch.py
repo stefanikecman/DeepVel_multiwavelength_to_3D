@@ -222,14 +222,9 @@ class DeepVel_net5(nn.Module):
 
         self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
-        # self.pool_I_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
-        # self.pool_res_I = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
         
         self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
-        
-        # self.pool_V_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))        
-        # self.pool_res_V = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
 
         self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)        
         self.adapt_pool = nn.AdaptiveMaxPool3d((self.n_heights, None, None))
@@ -548,7 +543,6 @@ class DeepVel_run(object):
         else:
             self.model.load_state_dict(model_weights)
         self.model.eval()
-        # print("Model input shapes:", I.shape, V.shape)
         I = self.to_tensor(I)
         V = self.to_tensor(V)
         
@@ -566,7 +560,6 @@ if (__name__ == '__main__'):
 
     main_root = "/dat/xenoss/"
 
-    ######### NOTE training multiheight models ########
     version = "v12"
     dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset/train/'
     input_shape = (2, 156, 64, 64)  # (channels, wavelengths, height, width)

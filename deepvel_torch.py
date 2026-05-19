@@ -25,8 +25,8 @@ class dataset_deepVel(Dataset):
 
         self.stokes_profile = stokes_profile
         self.out_channels = out_channels
-        # self.intensities_dir = os.path.join(dataset_path, f"inputs/stokes_{self.stokes_profile}")
-        self.intensities_dir = os.path.join(dataset_path, f"inputs/intensities") # NOTE patch for testing the project version
+        self.intensities_dir = os.path.join(dataset_path, f"inputs/stokes_{self.stokes_profile}")
+        #self.intensities_dir = os.path.join(dataset_path, f"inputs/intensities") # NOTE patch for testing the project version
         self.velocities_dir = os.path.join(dataset_path, "labels/tau_" + tau)
 
         intensities = os.listdir(self.intensities_dir)
@@ -41,8 +41,8 @@ class dataset_deepVel(Dataset):
         #NOTE new way of loading data:
         if test == False:
             for i in range(len(intensities)):
-                # intensity_index = intensities[i].replace(f'stokes_{self.stokes_profile}_', '')
-                intensity_index = intensities[i].replace(f'intensities_', '') # NOTE patch for testing the project version
+                intensity_index = intensities[i].replace(f'stokes_{self.stokes_profile}_', '')
+                #intensity_index = intensities[i].replace(f'intensities_', '') # NOTE patch for testing the project version
                 velocity_index = velocities[i].replace('velocities_', '')
 
                 if velocity_index != intensity_index:
@@ -352,14 +352,7 @@ class DeepVel_net2(nn.Module):
 
 class DeepVel_net3(nn.Module):
     """
-    Version suitable for v5 dataset, 519 wavelengths, therefore more pooling in the wavelength domain is needed.
-
-    Model definition. Modified original DeepVel_net:
-    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
-    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
-    - decreased the number of filters to reduce the number of parameters
-    - added Max pooling in the wavelength domain
-    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
+    Version suitable for v5, v6, v7, v8 dataset, large number of wavelengths, therefore more pooling in the wavelength domain is needed.
     """
     def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
         super(DeepVel_net3, self).__init__()
@@ -431,8 +424,8 @@ class DeepVel_run(object):
         self.out_channels = out_shape[0]
         self.stokes_profile = stokes_profile
 
-        #self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
-        self.model = DeepVel_netProject(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
+        self.model = DeepVel_net(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
+        #self.model = DeepVel_netProject(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers)
 
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
@@ -597,12 +590,11 @@ class DeepVel_run(object):
             x = torch.from_numpy(x.astype(np.float32))
         
         if x.dim() == 3:
-            x = x.unsqueeze(0)#.unsqueeze(0) #patch for the project version
+            x = x.unsqueeze(0).unsqueeze(0)
 
         elif x.dim() == 4:
             x = x.unsqueeze(0)
 
-        #x = normalize_layerwise(x)
         start = time.time()
     
         with torch.no_grad():    
@@ -639,5 +631,5 @@ if (__name__ == '__main__'):
             print(f"Training for tau: {taus[i]} and stokes profile: {stokes_profile}...")
             tau = taus[i]
             deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 128, dataset_path = dataset_path, 
-                                    network_path = f"/scratch/xenoss/{version}/tau_{tau}/project_intensities_model/checkpoints/", stokes_profile=stokes_profile)
+                                    network_path = f"/scratch/xenoss/{version}/tau_{tau}/stokes_{stokes_profile.lower()}_model/checkpoints/", stokes_profile=stokes_profile)
             deepvel_net.train(100)
