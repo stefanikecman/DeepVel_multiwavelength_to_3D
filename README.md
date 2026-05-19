@@ -1,4 +1,4 @@
-# Multi-height Inference of Plasma Flows in the Solar atmosphere using Deep Learning
+# Multi-height Inference of Plasma Flows in the Solar Atmosphere using Deep Learning
 
 ## About
 
