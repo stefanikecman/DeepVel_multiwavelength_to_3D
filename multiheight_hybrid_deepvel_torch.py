@@ -31,10 +31,22 @@ class dataset_deepVel(Dataset):
         stokes_I.sort()
         stokes_V.sort()
 
-        stokes_I = stokes_I#[:31360] #only for experiment 1
-        stokes_V = stokes_V#[:31360] #only for experiment 1
-        velocities = velocities#[:31360] #only for experiment 1
+        stokes_I = stokes_I
+        stokes_V = stokes_V
+        velocities = velocities
  
+        sample_i = np.load(os.path.join(self.stokes_I_dir, stokes_I[0]))
+        sample_v = np.load(os.path.join(self.stokes_V_dir, stokes_V[0]))
+        sample_vel = np.load(os.path.join(self.velocities_dir, velocities[0]))
+        self.stokes_I = torch.empty((len(stokes_I), *sample_i.shape), dtype=torch.float32)
+        self.stokes_V = torch.empty((len(stokes_V), *sample_v.shape), dtype=torch.float32)
+        self.velocities = torch.empty((len(velocities), *sample_vel.shape), dtype=torch.float32)
+
+        if sample_i.ndim == 3:
+            sample_i = np.expand_dims(sample_i, axis=0)
+        if sample_v.ndim == 3:
+            sample_v = np.expand_dims(sample_v, axis=0)
+
         if test==False:
             for v, I, V in zip(velocities, stokes_I, stokes_V):
                 velocity_index = v.replace('velocities_', '')
@@ -46,29 +58,48 @@ class dataset_deepVel(Dataset):
                 if stokes_V_index != velocity_index:
                     raise ValueError("Input (stokes V) - label data not corresponding: ", V + " "+ v)
 
-            self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
-            self.stokes_I = []
-            for f in stokes_I:
-                i = torch.from_numpy(np.load(os.path.join(self.stokes_I_dir, f)).astype(np.float32))
-                if i.dim() == 3:
-                    i = i.unsqueeze(0)
-                self.stokes_I.append(i)
+            # self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
+            # self.stokes_I = []
+            # for f in stokes_I:
+            #     i = torch.from_numpy(np.load(os.path.join(self.stokes_I_dir, f)).astype(np.float32))
+            #     if i.dim() == 3:
+            #         i = i.unsqueeze(0)
+            #     self.stokes_I.append(i)
 
-            self.stokes_V = []
-            for f in stokes_V:
-                i = torch.from_numpy(np.load(os.path.join(self.stokes_V_dir, f)).astype(np.float32))
-                if i.dim() == 3:
-                    i = i.unsqueeze(0)
-                self.stokes_V.append(i)
+            # self.stokes_V = []
+            # for f in stokes_V:
+            #     i = torch.from_numpy(np.load(os.path.join(self.stokes_V_dir, f)).astype(np.float32))
+            #     if i.dim() == 3:
+            #         i = i.unsqueeze(0)
+            #     self.stokes_V.append(i)
+
+            # if self.out_channels == 1:
+            #     self.velocities = [vel[:, 2,:,:].unsqueeze(0) for vel in self.velocities]
+
+            # elif self.out_channels == 2:
+            #     self.velocities = [vel[:, :2,:,:].unsqueeze(0) for vel in self.velocities]
+
+            for i in range(len(stokes_I)):
+                if i%1000 == 0:
+                    print(f"Loading data: {i}/{len(stokes_I)}")
+                stokes_I_el = np.load(os.path.join(self.stokes_I_dir, stokes_I[i]))
+                stokes_V_el = np.load(os.path.join(self.stokes_V_dir, stokes_V[i]))
+                vel = np.load(os.path.join(self.velocities_dir, velocities[i]))
+                if stokes_I_el.ndim == 3:
+                    stokes_I_el = np.expand_dims(stokes_I_el, axis=0)
+                if stokes_V_el.ndim == 3:
+                    stokes_V_el = np.expand_dims(stokes_V_el, axis=0)
+                self.stokes_I[i].copy_(torch.from_numpy(stokes_I_el).float())
+                self.stokes_V[i].copy_(torch.from_numpy(stokes_V_el).float())
+                self.velocities[i].copy_(torch.from_numpy(vel).float())
+                # self.intensities.append(i)
+            # self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f)).astype(np.float32)) for f in velocities]
+            # self.velocities = [torch.from_numpy(np.load(os.path.join(self.velocities_dir, f))) for f in velocities]
             
-            # self.stokes_I = [torch.from_numpy(np.load(os.path.join(self.stokes_I_dir, f)).astype(np.float32)) for f in stokes_I]
-            # self.stokes_V = [torch.from_numpy(np.load(os.path.join(self.stokes_V_dir, f)).astype(np.float32)) for f in stokes_V]
-
             if self.out_channels == 1:
-                self.velocities = [vel[2,:,:].unsqueeze(0) for vel in self.velocities]
-
-            elif self.out_channels == 2:
-                self.velocities = [vel[:2,:,:].unsqueeze(0) for vel in self.velocities]
+                self.velocities = self.velocities[:,:,2,:,:]
+            if self.out_channels == 2:
+                self.velocities = self.velocities[:,:,:2,:,:]
 
             print("Loaded {} velocity files, {} stokes I files, {} stokes V files.".format(len(self.velocities), len(self.stokes_I), len(self.stokes_V)))
 
@@ -165,198 +196,17 @@ class ResidualBlock(nn.Module):
         out += residual
         return out
     
-class DeepVel_net(nn.Module):
-    """
-        Model definition for DeepVel, modified to take magnetic field and vz as inputs.
-    """
-    def __init__(self, in_channels, out_channels, n_filters=32, blocks=20):
-        super(DeepVel_net, self).__init__()
+
+class DeepVel_net5(nn.Module):
+
+    def __init__(self, in_channels, out_channels, n_heights, n_filters=16, blocks=20):
+        super(DeepVel_net5, self).__init__()
 
         self.n_filters = n_filters
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.blocks = blocks
-
-        self.conv_I_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = 3, stride=1, padding=1),
-                                       nn.BatchNorm3d(self.n_filters),
-                                       nn.ReLU()
-                                       )
-        self.conv_V_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = 3, stride=1, padding=1),
-                                        nn.BatchNorm3d(self.n_filters),
-                                        nn.ReLU()
-                                        )
-        
-        self.residual2 = self.make_Reslayer(self.n_filters, self.blocks)
-        self.residual3 = self.make_Reslayer(self.n_filters, self.blocks)
-
-        self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm3d(self.n_filters))
-        self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = 3, stride=1, padding=1), nn.BatchNorm3d(self.n_filters))
-        # self.adapt_pool_I = nn.AdaptiveAvgPool3d((1, None, None))
-        # self.adapt_pool_V = nn.AdaptiveAvgPool3d((1, None, None))
-        self.adapt_pool = nn.AdaptiveAvgPool3d((1, None, None))
-        self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
-
-    def make_Reslayer(self, out_channels, num_blocks, stride=1):
-            """
-            Create a sequence of residual blocks.
-            Args:
-                out_channels: Number of output channels for each block
-                num_blocks: Number of residual blocks to create
-                stride: Stride for the first block
-            Returns:
-                nn.Sequential containing the residual blocks
-            """
-            strides = [stride] + [1]*(num_blocks-1)
-            layers = []
-            for stride in strides:
-                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
-                self.n_filters = out_channels
-            return nn.Sequential(*layers)
-
-    def forward(self, I, V):
-        """
-        Forward pass through the network.
-        """
-        out_I = self.conv_I_1(I)
-        res_I = out_I
-
-        out_V = self.conv_V_1(V)
-        res_V = out_V
-
-        out_I = self.residual2(out_I)
-        out_I = self.conv_I_2(out_I)
-        out_I += res_I
-        
-
-        out_V = self.residual3(out_V)
-        out_V = self.conv_V_2(out_V)
-        out_V += res_V
-
-        feat_ensemble = torch.cat((out_I, out_V), dim=1)
-
-        out = self.conv3(feat_ensemble)
-
-        out = self.adapt_pool(out)
-        out = out.squeeze(2)
-
-        return out
-    
-class DeepVel_net2(nn.Module):
-    """
-    Model definition. Modified original DeepVel_net:
-    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
-    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
-    - decreased the number of filters to reduce the number of parameters
-    - added Max pooling in the wavelength domain
-    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
-    """
-    def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
-        super(DeepVel_net2, self).__init__()
-
-        self.n_filters = n_filters
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.blocks = blocks
-        
-
-        self.conv_I_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (10, 5, 5), stride=1, padding=(2,2,2)),
-                                       nn.BatchNorm3d(self.n_filters),
-                                       nn.ReLU(inplace=True)
-                                       )
-        self.pool_I_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
-
-        self.conv_V_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (10, 5, 5), stride=1, padding=(2,2,2)),
-                                        nn.BatchNorm3d(self.n_filters),
-                                        nn.ReLU(inplace=True)
-                                        )
-        self.pool_V_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
-
-        self.residual2 = self.make_Reslayer(self.n_filters, self.blocks)
-        self.residual3 = self.make_Reslayer(self.n_filters, self.blocks)
-
-        self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
-                                      nn.BatchNorm3d(self.n_filters))
-        self.pool_I_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-        self.pool_res_I = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-        
-        self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (5, 3, 3), stride=1, padding=(2,1,1)), 
-                                      nn.BatchNorm3d(self.n_filters))
-        
-        self.pool_V_2 = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))        
-        self.pool_res_V = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-
-        self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
-        self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-        
-        self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
-        
-
-    def make_Reslayer(self, out_channels, num_blocks, stride=1):
-            """
-            Create a sequence of residual blocks.
-            Args:
-                out_channels: Number of output channels for each block
-                num_blocks: Number of residual blocks to create
-                stride: Stride for the first block (default is 1)
-            Returns:
-                A sequential container of residual blocks
-            """
-            strides = [stride] + [1]*(num_blocks-1)
-            layers = []
-            for stride in strides:
-                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
-                self.n_filters = out_channels
-            return nn.Sequential(*layers)
-
-    def forward(self, I, V):
-        """
-        Forward pass through the network.
-        """  
-
-        out_I = self.conv_I_1(I)
-        out_I = self.pool_I_1(out_I)
-        res_I = out_I
-
-        out_V = self.conv_V_1(V)
-        out_V = self.pool_V_1(out_V)
-        res_V = out_V
-
-        out_I = self.residual2(out_I)
-        out_I = self.conv_I_2(out_I)
-        out_I = self.pool_I_2(out_I)
-        out_I += self.pool_res_I(res_I)
-        
-
-        out_V = self.residual3(out_V)
-        out_V = self.conv_V_2(out_V)
-        out_V = self.pool_V_2(out_V)
-        out_V += self.pool_res_V(res_V)
-
-        feat_ensemble = torch.cat((out_I, out_V), dim=1)
-
-        out = self.conv3(feat_ensemble)
-        out = self.max_pool(out)
-        out = self.adapt_pool(out)
-        out = out.squeeze(2)
-
-        return out
-
-class DeepVel_net3(nn.Module):
-    """
-    Model definition. Modified original DeepVel_net:
-    - increased kernel size in the first convolutional layer to capture more information from the input data (max 10, min 3)
-    - decreased kernel size in the second convolutional layer to capture more local information after the residual blocks
-    - decreased the number of filters to reduce the number of parameters
-    - added Max pooling in the wavelength domain
-    - avoid the adaptive pooling and do max pooling bit by bit to reduce the wavelengths and then pool them to one
-    """
-    def __init__(self, in_channels, out_channels, n_filters=16, blocks=20):
-        super(DeepVel_net3, self).__init__()
-
-        self.n_filters = n_filters
-        self.in_channels = in_channels
-        self.out_channels = out_channels
-        self.blocks = blocks
+        self.n_heights = n_heights
         
 
         self.conv_I_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)),
@@ -372,20 +222,99 @@ class DeepVel_net3(nn.Module):
 
         self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
-        self.pool_I_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
-        self.pool_res_I = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        # self.pool_I_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        # self.pool_res_I = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
         
         self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
                                       nn.BatchNorm3d(self.n_filters))
         
-        self.pool_V_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))        
-        self.pool_res_V = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+        # self.pool_V_2 = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))        
+        # self.pool_res_V = nn.MaxPool3d(kernel_size=(9, 1, 1), stride=(9, 1, 1))
+
+        self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)        
+        self.adapt_pool = nn.AdaptiveMaxPool3d((self.n_heights, None, None))
+        
+
+    def make_Reslayer(self, out_channels, num_blocks, stride=1):
+            """
+            Create a sequence of residual blocks.
+            Args:
+                out_channels: Number of output channels for each block
+                num_blocks: Number of residual blocks to create
+                stride: Stride for the first block (default is 1)
+            Returns:
+                A sequential container of residual blocks
+            """
+            strides = [stride] + [1]*(num_blocks-1)
+            layers = []
+            for stride in strides:
+                layers.append(ResidualBlock(self.n_filters, out_channels, stride))
+                self.n_filters = out_channels
+            return nn.Sequential(*layers)
+
+    def forward(self, I, V):
+        """
+        Forward pass through the network.
+        """  
+
+        out_I = self.conv_I_1(I)
+        out_I = self.pool_I_1(out_I)
+        res_I = out_I
+
+        out_V = self.conv_V_1(V)
+        out_V = self.pool_V_1(out_V)
+        res_V = out_V
+
+        out_I = self.residual2(out_I)
+        out_I = self.conv_I_2(out_I)
+        out_I += res_I        
+
+        out_V = self.residual3(out_V)
+        out_V = self.conv_V_2(out_V)
+        out_V += res_V
+
+        feat_ensemble = torch.cat((out_I, out_V), dim=1)
+        out = self.adapt_pool(feat_ensemble)
+        out = self.conv3(out)
+        
+        out = out.permute(0, 2, 1, 3, 4)
+        return out
+    
+class DeepVel_net4(nn.Module):
+
+    def __init__(self, in_channels, out_channels, n_heights, n_filters=16, blocks=20):
+        super(DeepVel_net4, self).__init__()
+
+        self.n_filters = n_filters
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.blocks = blocks
+        self.n_heights = n_heights
+
+        self.conv_I_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)),
+                                       nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        self.pool_I_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
+
+        self.conv_V_1 = nn.Sequential(nn.Conv3d(self.in_channels, self.n_filters, kernel_size = (25, 5, 5), stride=1, padding=(12,2,2)),
+                                        nn.BatchNorm3d(self.n_filters), nn.ReLU(inplace=True))
+        self.pool_V_1 = nn.MaxPool3d(kernel_size=(5, 1, 1), stride=(5, 1, 1))
+
+        self.residual2 = self.make_Reslayer(self.n_filters, self.blocks)
+        self.residual3 = self.make_Reslayer(self.n_filters, self.blocks)
+
+        self.conv_I_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
+                                      nn.BatchNorm3d(self.n_filters))
+        self.pool_I_2 = nn.AdaptiveMaxPool3d((self.n_heights, None, None))
+        self.pool_res_I = nn.AdaptiveMaxPool3d((self.n_heights, None, None))
+        
+        self.conv_V_2 = nn.Sequential(nn.Conv3d(self.n_filters, self.n_filters, kernel_size = (15, 3, 3), stride=1, padding=(7,1,1)), 
+                                      nn.BatchNorm3d(self.n_filters))
+        
+        self.pool_V_2 = nn.AdaptiveMaxPool3d((self.n_heights, None, None))
+        self.pool_res_V = nn.AdaptiveMaxPool3d((self.n_heights, None, None))        
 
         self.conv3 = nn.Conv3d(2*self.n_filters, self.out_channels, kernel_size = 1, stride=1, padding=0)
-        # self.max_pool = nn.MaxPool3d(kernel_size=(3, 1, 1), stride=(3, 1, 1))
-        
-        self.adapt_pool = nn.AdaptiveMaxPool3d((1, None, None))
-        
+            
 
     def make_Reslayer(self, out_channels, num_blocks, stride=1):
             """
@@ -421,7 +350,6 @@ class DeepVel_net3(nn.Module):
         out_I = self.conv_I_2(out_I)
         out_I = self.pool_I_2(out_I)
         out_I += self.pool_res_I(res_I)
-        
 
         out_V = self.residual3(out_V)
         out_V = self.conv_V_2(out_V)
@@ -431,10 +359,7 @@ class DeepVel_net3(nn.Module):
         feat_ensemble = torch.cat((out_I, out_V), dim=1)
 
         out = self.conv3(feat_ensemble)
-        # out = self.max_pool(out)
-        out = self.adapt_pool(out)
-        out = out.squeeze(2)
-
+        out = out.permute(0, 2, 1, 3, 4)
         return out
 
 
@@ -442,7 +367,7 @@ class DeepVel_run(object):
     """
     Class for running the DeepVel model, modified to take two inputs: Stokes I and Stokes V.
     """
-    def __init__(self, batch, dataset_path, network_path, in_shape = (2, 43, 64, 64), out_shape = (3, 64, 64), root = None, tau = None, test=False):
+    def __init__(self, batch, dataset_path, network_path, in_shape = (2, 43, 64, 64), out_shape = (4, 3, 64, 64), root = None, tau = None, test=False):
  
         self.root = root
         self.n_filters = 16
@@ -451,10 +376,11 @@ class DeepVel_run(object):
         self.n_conv_layers = 20
         self.tau = tau
         self.in_channels, self.n_wavelengths, self.height, self.width = in_shape
-        self.out_channels = out_shape[0]
+        self.out_channels = out_shape[1]
+        self.n_height = out_shape[0]
         self.lr = 1e-4
         self.network_path = network_path
-        self.model = DeepVel_net2(in_channels=self.in_channels, out_channels=self.out_channels, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
+        self.model = DeepVel_net5(in_channels=self.in_channels, out_channels=self.out_channels, n_heights=self.n_height, n_filters=self.n_filters, blocks=self.n_conv_layers).to(device)
         if torch.cuda.is_available() and torch.cuda.device_count() > 1:
             self.model = nn.DataParallel(self.model)
 
@@ -471,8 +397,6 @@ class DeepVel_run(object):
             self.summary = summary(self.model, input_data = (torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width), torch.randn(self.batch_size, self.in_channels, self.n_wavelengths, self.height, self.width)), device=device)
 
         self.criterion = nn.MSELoss()
-        # self.criterion = div_vor_loss
-        # self.criterion = lambda pred, gt: div_vor_loss(pred, gt, alpha1=1.0, alpha2=1e8, alpha3=1e8)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
 
     def train(self, epochs):
@@ -501,7 +425,6 @@ class DeepVel_run(object):
             for batch_i, (I, V, y) in enumerate(self.trainloader):
                 self.optimizer.zero_grad()
                 outputs = self.model(I.to(device), V.to(device))
-
                 loss_tuple = self.criterion(outputs, y.to(device))
                 if isinstance(loss_tuple, tuple):
                     loss, mse1, mse2, mse3 = loss_tuple
@@ -643,13 +566,12 @@ if (__name__ == '__main__'):
 
     main_root = "/dat/xenoss/"
 
-    taus = ["1e-1"]
-    version = "v4"
+    ######### NOTE training multiheight models ########
+    version = "v12"
     dataset_path = f'/dat/xenoss/thesis/data/{version}/dataset/train/'
-    input_shape = (2, 175, 16, 16)  # (channels, wavelengths, height, width)
-    output_shape = (1, 16, 16)    # (velocity components, height, width)
+    input_shape = (2, 156, 64, 64)  # (channels, wavelengths, height, width)
+    output_shape = (5, 3, 64, 64)    # (velocity components, height, width)
 
-    for tau in taus:
-        deepvel_net = DeepVel_run(root = main_root, tau = tau, test=False, in_shape = input_shape, out_shape=output_shape, batch = 256, dataset_path = dataset_path, 
-                                    network_path = f"/scratch/xenoss/{version}/tau_{tau}/hybrid_vz_model/checkpoints/")
-        deepvel_net.train(100)
+    deepvel_net = DeepVel_run(root = main_root, test=False, in_shape = input_shape, out_shape=output_shape, batch = 64, dataset_path = dataset_path, 
+                                    network_path = f"/scratch/xenoss/{version}/hybrid_model/checkpoints/")
+    deepvel_net.train(100)
