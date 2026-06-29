@@ -19,7 +19,7 @@ https://www.aanda.org/articles/aa/pdf/2017/08/aa30783-17.pdf
 ## Getting Started
 
 ### Prerequisites
-- Python 3.8+
+- Python 3.10
 
 ### Installation
 
